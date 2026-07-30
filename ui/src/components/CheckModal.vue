@@ -1,19 +1,17 @@
 <script lang="ts" setup>
-import {Toast, VButton, VModal, VSpace} from "@halo-dev/components";
-import {defineEmits, ref, resolveComponent} from "vue";
-import {type CheckLinkSubmitRequest, type LinkSubmit, LinkSubmitSpecTypeEnum} from "@/api/generated";
-import {linkSubmitApiClient} from "@/api";
-import {useQueryClient} from "@tanstack/vue-query";
-import {axiosInstance} from "@halo-dev/api-client";
-import type {LinkList} from "@/domain";
-const vCodemirror = resolveComponent("VCodemirror");
+import { Toast, VButton, VModal, VSpace } from "@halo-dev/components";
+import { ref } from "vue";
+import { type CheckLinkSubmitRequest, type LinkSubmit, LinkSubmitSpecTypeEnum } from "@/api/generated";
+import { linkSubmitApiClient } from "@/api";
+import { useQueryClient } from "@tanstack/vue-query";
+import { axiosInstance } from "@halo-dev/api-client";
+import type { LinkList } from "@/domain";
 
 const props = withDefaults(
   defineProps<{
     linkSubmit: LinkSubmit;
   }>(),
-  {
-  }
+  {}
 );
 
 const emit = defineEmits<{
@@ -24,15 +22,17 @@ const saving = ref<boolean>(false);
 const formState = ref<CheckLinkSubmitRequest>({
   checkStatus: true,
   reason: "",
-})
+});
 const queryClient = useQueryClient();
 const modal = ref<InstanceType<typeof VModal> | null>(null);
 
-
 const handleCheck = async () => {
-  if (formState.value.checkStatus && props.linkSubmit?.spec.type == LinkSubmitSpecTypeEnum.Update) {
-    if (formState.value.linkName == null || formState.value.linkName == '') {
-      Toast.error('请选择链接!');
+  if (
+    formState.value.checkStatus &&
+    props.linkSubmit?.spec.type == LinkSubmitSpecTypeEnum.Update
+  ) {
+    if (formState.value.linkName == null || formState.value.linkName == "") {
+      Toast.error("请选择链接!");
       return;
     }
   }
@@ -43,13 +43,11 @@ const handleCheck = async () => {
       checkLinkSubmitRequest: formState.value,
     });
     modal.value?.close();
-    Toast.success('保存成功');
-  } catch (error) {
-    console.error("Failed to check LinkSubmit", error);
+    Toast.success("保存成功");
   } finally {
     queryClient.invalidateQueries({
-      queryKey: ["link-submits"]
-    })
+      queryKey: ["link-submits"],
+    });
     saving.value = false;
   }
 };
@@ -57,7 +55,8 @@ const handleCheck = async () => {
 const handleSelectLinkRemote = {
   search: async ({ keyword, page, size }: { keyword: string; page: number; size: number }) => {
     const { data } = await axiosInstance.get<LinkList>(
-      `/apis/api.link.halo.run/v1alpha1/links`,{
+      `/apis/api.link.halo.run/v1alpha1/links`,
+      {
         params: {
           page: page,
           size: size,
@@ -79,25 +78,28 @@ const handleSelectLinkRemote = {
     return [];
   },
 };
-
 </script>
 <template>
   <VModal
     ref="modal"
-    :title="linkSubmit.spec.type == LinkSubmitSpecTypeEnum.Add ? '友链提交审核' : '友链审核'"
+    :title="
+      linkSubmit.spec.type == LinkSubmitSpecTypeEnum.Add
+        ? '友链提交审核'
+        : '友链审核'
+    "
     :width="650"
     @close="emit('close')"
   >
     <FormKit
-        id="check-form"
-        name="check-form"
-        type="form"
-        :config="{ validationVisibility: 'submit' }"
-        @submit="handleCheck"
+      id="check-form"
+      name="check-form"
+      type="form"
+      :config="{ validationVisibility: 'submit' }"
+      @submit="handleCheck"
     >
       <FormKit
         :disabled="true"
-        v-if="linkSubmit.spec.type == LinkSubmitSpecTypeEnum.Update" 
+        v-if="linkSubmit.spec.type == LinkSubmitSpecTypeEnum.Update"
         :value="linkSubmit.spec.oldUrl"
         name="oldUrl"
         type="text"
@@ -106,9 +108,9 @@ const handleSelectLinkRemote = {
       <FormKit
         v-model="formState.checkStatus"
         :options="[
-            { label: '通过', value: true},
-            { label: '不通过', value: false},
-          ]"
+          { label: '通过', value: true },
+          { label: '不通过', value: false },
+        ]"
         label="审核状态"
         name="checkStatus"
         type="select"
@@ -141,15 +143,13 @@ const handleSelectLinkRemote = {
     <template #footer>
       <VSpace>
         <VButton
-            :loading="saving"
-            type="secondary"
-            @click="$formkit.submit('check-form')"
+          :loading="saving"
+          type="secondary"
+          @click="$formkit.submit('check-form')"
         >
           提交
         </VButton>
-        <VButton @click="modal?.close()">
-          取消
-        </VButton>
+        <VButton @click="modal?.close()"> 取消 </VButton>
       </VSpace>
     </template>
   </VModal>

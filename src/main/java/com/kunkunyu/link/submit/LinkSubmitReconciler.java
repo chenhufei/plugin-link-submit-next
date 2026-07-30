@@ -17,18 +17,13 @@ import run.halo.app.notification.NotificationCenter;
 import run.halo.app.notification.UserIdentity;
 import java.util.Set;
 
-import static com.kunkunyu.link.submit.Constant.ADMIN_LINK_SUBMIT;
 import static com.kunkunyu.link.submit.Constant.FINALIZER_NAME;
-import static com.kunkunyu.link.submit.Constant.REVIEW_LINK_SUBMIT;
-import static com.kunkunyu.link.submit.Constant.USER_LINK_SUBMIT;
 import static run.halo.app.extension.ExtensionUtil.addFinalizers;
 import static run.halo.app.extension.ExtensionUtil.removeFinalizers;
 
 /**
  * Reconciler for {@link LinkSubmit}.
- *
  */
-
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -44,68 +39,73 @@ public class LinkSubmitReconciler implements Reconciler<Reconciler.Request> {
 
     @Override
     public Result reconcile(Request request) {
-        client.fetch(LinkSubmit.class, request.name())
-            .ifPresent(linkSubmit -> {
-                if (ExtensionUtil.isDeleted(linkSubmit)) {
-                    removeFinalizers(linkSubmit.getMetadata(), Set.of(FINALIZER_NAME));
-                    client.update(linkSubmit);
-                    return;
-                }
-
-                var spec = linkSubmit.getSpec();
-                String email = spec.getEmail();
-                if (addFinalizers(linkSubmit.getMetadata(), Set.of(FINALIZER_NAME))) {
-                    var basicConfig = settingConfigLinkSubmit.getBasicConfig().block();
-                    boolean sendEmail = basicConfig.isSendEmail();
-                    if (sendEmail) {
-                        adminNoticeSubscription(basicConfig.getAdminEmail());
+        try {
+            client.fetch(LinkSubmit.class, request.name())
+                .ifPresent(linkSubmit -> {
+                    if (ExtensionUtil.isDeleted(linkSubmit)) {
+                        removeFinalizers(linkSubmit.getMetadata(), Set.of(FINALIZER_NAME));
+                        client.update(linkSubmit);
+                        return;
                     }
-                    var status = spec.getStatus();
-                    if (StringUtils.isNotEmpty(email) && status.equals(LinkSubmit.LinkSubmitStatus.pending)) {
-                        userNoticeSubscription(email);
+
+                    var spec = linkSubmit.getSpec();
+                    String email = spec.getEmail();
+
+                    if (addFinalizers(linkSubmit.getMetadata(), Set.of(FINALIZER_NAME))) {
+                        handleNewSubmission(linkSubmit, spec, email);
+                        client.update(linkSubmit);
+                        return;
                     }
-                    eventPublisher.publishEvent(new LinkSubmitEvent(this, linkSubmit));
-                    client.update(linkSubmit);
-                    return;
-                }
 
-                if (spec.getStatus().equals(LinkSubmit.LinkSubmitStatus.refuse) || spec.getStatus().equals(LinkSubmit.LinkSubmitStatus.review)) {
-                    if (StringUtils.isNotEmpty(email)) {
-                        reviewNoticeSubscription(email);
-                    }
-                    eventPublisher.publishEvent(new ReviewLinkSubmitEvent(this, linkSubmit));
-                }
-            });
-        return Result.doNotRetry();
+                    handleStatusChange(linkSubmit, spec, email);
+                });
+            return Result.doNotRetry();
+        } catch (Exception e) {
+            log.error("Reconcile failed for {}: {}", request.name(), e.getMessage());
+            return Result.requeue(java.time.Duration.ofSeconds(30));
+        }
     }
 
-    void adminNoticeSubscription(String email) {
-        var interestReason = new Subscription.InterestReason();
-        interestReason.setReasonType(ADMIN_LINK_SUBMIT);
-        interestReason.setExpression("props.adminEmail == '%s'".formatted(email));
-        var subscriber = new Subscription.Subscriber();
-        subscriber.setName(UserIdentity.anonymousWithEmail(email).name());
-        notificationCenter.subscribe(subscriber, interestReason).block();
+    private void handleNewSubmission(LinkSubmit linkSubmit, LinkSubmit.LinkSubmitSpec spec, String email) {
+        var basicConfig = settingConfigLinkSubmit.getBasicConfig().blockOptional();
+        if (basicConfig.isPresent()) {
+            var config = basicConfig.get();
+            if (config.isSendEmail() && StringUtils.isNotEmpty(config.getAdminEmail())) {
+                subscribeNotification(config.getAdminEmail(), Constant.ADMIN_LINK_SUBMIT);
+            }
+        }
+
+        if (StringUtils.isNotEmpty(email)
+            && spec.getStatus().equals(LinkSubmit.ReviewStatus.pending)) {
+            subscribeNotification(email, Constant.USER_LINK_SUBMIT);
+        }
+
+        eventPublisher.publishEvent(new LinkSubmitEvent(this, linkSubmit));
     }
 
-    void userNoticeSubscription(String email) {
-        var interestReason = new Subscription.InterestReason();
-        interestReason.setReasonType(USER_LINK_SUBMIT);
-        interestReason.setExpression("props.email == '%s'".formatted(email));
-        var subscriber = new Subscription.Subscriber();
-        subscriber.setName(UserIdentity.anonymousWithEmail(email).name());
-        notificationCenter.subscribe(subscriber, interestReason).block();
+    private void handleStatusChange(LinkSubmit linkSubmit, LinkSubmit.LinkSubmitSpec spec, String email) {
+        if (spec.getStatus().equals(LinkSubmit.ReviewStatus.refuse)
+            || spec.getStatus().equals(LinkSubmit.ReviewStatus.review)) {
+            if (StringUtils.isNotEmpty(email)) {
+                subscribeNotification(email, Constant.REVIEW_LINK_SUBMIT);
+            }
+            eventPublisher.publishEvent(new ReviewLinkSubmitEvent(this, linkSubmit));
+        }
     }
 
-    void reviewNoticeSubscription(String email) {
-        var interestReason = new Subscription.InterestReason();
-        interestReason.setReasonType(REVIEW_LINK_SUBMIT);
-        interestReason.setExpression("props.email == '%s'".formatted(email));
-        var subscriber = new Subscription.Subscriber();
-        subscriber.setName(UserIdentity.anonymousWithEmail(email).name());
-        notificationCenter.subscribe(subscriber, interestReason).block();
+    private void subscribeNotification(String email, String reasonType) {
+        try {
+            var interestReason = new Subscription.InterestReason();
+            interestReason.setReasonType(reasonType);
+            interestReason.setExpression("props.email == '%s'".formatted(email));
+            var subscriber = new Subscription.Subscriber();
+            subscriber.setName(UserIdentity.anonymousWithEmail(email).name());
+            notificationCenter.subscribe(subscriber, interestReason).block();
+        } catch (Exception e) {
+            log.warn("Failed to subscribe notification for email={}, reasonType={}: {}",
+                email, reasonType, e.getMessage());
+        }
     }
-
 
     @Override
     public Controller setupWith(ControllerBuilder builder) {

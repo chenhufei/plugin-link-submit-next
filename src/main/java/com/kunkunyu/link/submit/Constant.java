@@ -1,8 +1,9 @@
 package com.kunkunyu.link.submit;
 
-public enum Constant {
-    ;
+public final class Constant {
 
+    private Constant() {
+    }
 
     public static final String MARK_AS_NOTIFIED = "link.submit.kunkunyu.com/mark-as-notified";
 
@@ -18,5 +19,4 @@ public enum Constant {
     public static final String MOVE = "move";
 
     public static final String ORIGINAL_GROUP_NAME = "original-group-name";
-
 }

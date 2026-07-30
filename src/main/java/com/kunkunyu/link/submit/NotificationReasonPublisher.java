@@ -48,12 +48,12 @@ public class NotificationReasonPublisher {
         var basicConfig = settingConfigLinkSubmit.getBasicConfig().block();
         boolean sendEmail = basicConfig.isSendEmail();
         if (sendEmail) {
-            adminLinkSubmitNoticeReasonPublisher.publishReasonBy(linkSubmit,basicConfig.getAdminEmail());
+            adminLinkSubmitNoticeReasonPublisher.publishReasonBy(linkSubmit, basicConfig.getAdminEmail());
         }
         var status = linkSubmit.getSpec().getStatus();
         String email = linkSubmit.getSpec().getEmail();
-        if (StringUtils.isNotEmpty(email) && status.equals(LinkSubmit.LinkSubmitStatus.pending)) {
-            userLinkSubmitNoticeReasonPublisher.publishReasonBy(linkSubmit,email);
+        if (StringUtils.isNotEmpty(email) && status.equals(LinkSubmit.ReviewStatus.pending)) {
+            userLinkSubmitNoticeReasonPublisher.publishReasonBy(linkSubmit, email);
         }
     }
 
@@ -67,7 +67,7 @@ public class NotificationReasonPublisher {
             if (annotations.containsKey(MARK_AS_NOTIFIED)) {
                 return;
             }
-            reviewLinkSubmitNoticeReasonPublisher.publishReasonBy(linkSubmit,email);
+            reviewLinkSubmitNoticeReasonPublisher.publishReasonBy(linkSubmit, email);
             ReviewLinkSubmitMarkAsNotified(linkSubmit.getMetadata().getName());
         }
     }
@@ -87,7 +87,7 @@ public class NotificationReasonPublisher {
         private final ExternalLinkProcessor externalLinkProcessor;
 
 
-        public void publishReasonBy(LinkSubmit linkSubmit,String adminEmail) {
+        public void publishReasonBy(LinkSubmit linkSubmit, String adminEmail) {
             String url = externalLinkProcessor.processLink("/console/link-submit");
             var spec = linkSubmit.getSpec();
             var reasonSubject = Reason.Subject.builder()
@@ -107,7 +107,7 @@ public class NotificationReasonPublisher {
                         .description(spec.getDescription())
                         .logo(spec.getLogo())
                         .type(spec.getType().name())
-                        .review(spec.getStatus().equals(LinkSubmit.LinkSubmitStatus.review))
+                        .review(spec.getStatus().equals(LinkSubmit.ReviewStatus.review))
                         .reviewUrl(url)
                         .build();
                     builder.attributes(ReasonDataConverter.toAttributeMap(attributes))
@@ -132,7 +132,7 @@ public class NotificationReasonPublisher {
         private final ExternalLinkProcessor externalLinkProcessor;
 
 
-        public void publishReasonBy(LinkSubmit linkSubmit,String email) {
+        public void publishReasonBy(LinkSubmit linkSubmit, String email) {
             String url = externalLinkProcessor.processLink("/console/link-submit");
             var spec = linkSubmit.getSpec();
             var reasonSubject = Reason.Subject.builder()
@@ -168,7 +168,7 @@ public class NotificationReasonPublisher {
         private final ExternalLinkProcessor externalLinkProcessor;
 
 
-        public void publishReasonBy(LinkSubmit linkSubmit,String email) {
+        public void publishReasonBy(LinkSubmit linkSubmit, String email) {
             var annotations = MetadataUtil.nullSafeAnnotations(linkSubmit);
             String reviewDescription = annotations.get(REVIEW_DESCRIPTION);
             String url = externalLinkProcessor.processLink("/console/link-submit");
@@ -186,7 +186,7 @@ public class NotificationReasonPublisher {
                         .email(email)
                         .type(spec.getType().name())
                         .reviewDescription(reviewDescription)
-                        .through(spec.getStatus().equals(LinkSubmit.LinkSubmitStatus.review))
+                        .through(spec.getStatus().equals(LinkSubmit.ReviewStatus.review))
                         .build();
                     builder.attributes(ReasonDataConverter.toAttributeMap(attributes))
                         .author(UserIdentity.anonymousWithEmail(email))

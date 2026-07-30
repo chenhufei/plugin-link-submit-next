@@ -5,29 +5,30 @@ import org.springframework.stereotype.Component;
 import run.halo.app.infra.ExternalUrlSupplier;
 
 import java.net.URL;
-
+import java.util.regex.Pattern;
 
 @Component
 @RequiredArgsConstructor
 public class CommonUtil {
-    private final ExternalUrlSupplier externalUrl;
 
-    public String getExternalUrl() {
-        URL externalUrlRaw = externalUrl.getRaw();
-        return externalUrlRaw.getHost();
-    }
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+        "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+    );
+
+    private final ExternalUrlSupplier externalUrl;
 
     public String getDomain() {
         URL externalUrlRaw = externalUrl.getRaw();
+        if (externalUrlRaw == null) {
+            return null;
+        }
         return externalUrlRaw.getAuthority();
     }
 
-    /**
-     * 校验是否是正确的邮箱格式
-     *
-     **/
     public boolean isValidEmail(String email) {
-        return email.matches("^([a-zA-Z0-9._-])+@([a-zA-Z0-9_-])+((.[a-zA-Z0-9_-]{2,3}){1,2})$");
+        if (email == null || email.isEmpty()) {
+            return false;
+        }
+        return EMAIL_PATTERN.matcher(email).matches();
     }
-
 }

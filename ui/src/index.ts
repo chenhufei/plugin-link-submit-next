@@ -9,12 +9,12 @@ export default definePlugin({
     {
       parentName: "ToolsRoot",
       route: {
-        path: "/link-submit",
-        name: "友链自助提交插件",
+        path: "/link-submit-next",
+        name: "LinkSubmitPro",
         component: () => import("@/views/HomeView.vue"),
         meta: {
-          title: "友链自助提交插件",
-          permissions: ["plugin:link:submit:view"],
+          title: "友链自助提交插件Pro",
+          permissions: ["plugin:link:submit-next:view"],
           searchable: true,
           menu: {
             name: "友链自助提交管理",

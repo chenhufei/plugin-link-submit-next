@@ -16,10 +16,10 @@ public class Link extends AbstractExtension {
 
     @Data
     public static class LinkSpec {
-        @Schema(required = true)
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         private String url;
 
-        @Schema(required = true)
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         private String displayName;
 
         private String logo;

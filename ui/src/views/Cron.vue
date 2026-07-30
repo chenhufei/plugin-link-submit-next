@@ -7,11 +7,11 @@ import {axiosInstance} from "@halo-dev/api-client";
 import type {LinkGroupList} from "@/domain";
 import {useMutation, useQuery} from "@tanstack/vue-query";
 
-const Se = "cron-link-submit-default"
+const CRON_LINK_SUBMIT_NAME = "cron-link-submit-default"
 
 const formState = ref<CronLinkSubmit>({
   metadata: {
-    name: Se,
+    name: CRON_LINK_SUBMIT_NAME,
     creationTimestamp: ""
   },
   spec: {
@@ -28,10 +28,10 @@ const formState = ref<CronLinkSubmit>({
 });
 
 const {isLoading: cronIsLoading, isFetching: cronIsFetching} = useQuery({
-  queryKey: ["cron-douban"],
+  queryKey: ["cron-link-submit"],
   queryFn: async () => {
     const {data} = await linkSubmitCoreApiClient.cronLinkSubmit.getCronLinkSubmit({
-      name: Se
+      name: CRON_LINK_SUBMIT_NAME
     },{
       mute: true
     });
@@ -44,11 +44,11 @@ const {isLoading: cronIsLoading, isFetching: cronIsFetching} = useQuery({
 })
 
 const { mutate:save, isLoading:saveIsLoading } = useMutation({
-  mutationKey: ["cron-douban-save"],
+  mutationKey: ["cron-link-submit-save"],
   mutationFn: async () => {
     if (formState.value.metadata.creationTimestamp) {
       const { data: data } = await linkSubmitCoreApiClient.cronLinkSubmit.getCronLinkSubmit({
-        name: Se
+        name: CRON_LINK_SUBMIT_NAME
       });
       formState.value = {
         ...formState.value,
@@ -56,7 +56,7 @@ const { mutate:save, isLoading:saveIsLoading } = useMutation({
         metadata: data.metadata
       };
       return await linkSubmitCoreApiClient.cronLinkSubmit.updateCronLinkSubmit({
-        name: Se,
+        name: CRON_LINK_SUBMIT_NAME,
         cronLinkSubmit: formState.value
       });
     }else {
@@ -178,7 +178,7 @@ const cronOptions = [{
           </FormKit>
         </FormKit>
       </div>
-      <div v-permission="['plugin:link:submit:manage']" class=":uno: pt-5">
+      <div v-permission="['plugin:link:submit-next:manage']" class=":uno: pt-5">
         <div class=":uno: flex justify-start">
           <VButton
             :loading="saveIsLoading"

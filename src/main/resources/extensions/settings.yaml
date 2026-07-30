@@ -1,7 +1,7 @@
 apiVersion: v1alpha1
 kind: Setting
 metadata:
-  name: link-submit-settings
+  name: link-submit-next-settings
 spec:
   forms:
     - group: basic
@@ -23,6 +23,25 @@ spec:
           name: autoAudit
           label: 开启自动审核
           value: false
+        - $formkit: number
+          name: dailySubmitLimit
+          label: 每日提交上限
+          help: 同一 IP 每天最多提交次数，0 表示不限制
+          value: 0
+          min: 0
+        - $formkit: switch
+          name: enableHealthCheck
+          label: 启用链接健康检测
+          help: 提交时自动检测链接可达性、SSL 状态
+          value: true
+        - $formkit: switch
+          name: enableLinkPreview
+          label: 启用链接预览
+          help: 提交时自动抓取网站标题、描述、favicon
+          value: true
+    - group: notification
+      label: 通知设置
+      formSchema:
         - $formkit: radio
           name: sendEmail
           id: sendEmail
@@ -43,6 +62,25 @@ spec:
           label: 管理员邮箱
           help: 管理员邮箱，用于接收邮件通知
           validation: required|email
+        - $formkit: switch
+          name: enableWebhook
+          label: 启用 Webhook 通知
+          help: 通过 Webhook 推送通知到企业微信/钉钉/飞书等
+          value: false
+        - $formkit: text
+          if: $get(enableWebhook).value === true
+          name: webhookUrl
+          label: Webhook URL
+          help: 填写企业微信/钉钉/飞书机器人的 Webhook 地址
+          validation: required|url
+        - $formkit: text
+          if: $get(enableWebhook).value === true
+          name: webhookSecret
+          label: Webhook 签名密钥
+          help: 可选，用于验证 Webhook 请求
+    - group: link
+      label: 友链设置
+      formSchema:
         - $formkit: select
           id: groupName
           name: groupName
@@ -58,7 +96,6 @@ spec:
             itemsField: items
             labelField: spec.displayName
             valueField: metadata.name
-          validation: required
         - $formkit: select
           id: forbidSelectedGroupName
           name: forbidSelectedGroupName

@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 import run.halo.app.extension.AbstractExtension;
 import run.halo.app.extension.GVK;
 
+import java.time.Instant;
+
 import static com.kunkunyu.link.submit.extension.LinkSubmit.KIND;
 import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 
@@ -26,13 +28,17 @@ public class LinkSubmit extends AbstractExtension {
     @Schema(requiredMode = REQUIRED)
     private LinkSubmitSpec spec;
 
+    private HealthStatus healthStatus;
+
+    private SubmitterProfile submitterProfile;
+
     @Data
     public static class LinkSubmitSpec {
 
-        @Schema(required = true)
+        @Schema(requiredMode = REQUIRED)
         private String url;
 
-        @Schema(required = true)
+        @Schema(requiredMode = REQUIRED)
         private String displayName;
 
         private String logo;
@@ -47,23 +53,44 @@ public class LinkSubmit extends AbstractExtension {
 
         private String rssUrl;
 
-        @Schema(required = true)
+        private String message;
+
+        @Schema(requiredMode = REQUIRED)
         private LinkSubmitType type;
 
-        @Schema(required = true)
-        private LinkSubmitStatus status;
+        @Schema(requiredMode = REQUIRED)
+        private ReviewStatus status;
     }
 
-    public static enum LinkSubmitType {
+    @Data
+    public static class HealthStatus {
+        private Boolean reachable;
+        private Integer httpStatusCode;
+        private Long responseTimeMs;
+        private Boolean sslValid;
+        private Boolean hiddenLinkDetected;
+        private Instant lastCheckedAt;
+        private String errorMessage;
+    }
+
+    @Data
+    public static class SubmitterProfile {
+        private String userAgent;
+        private String language;
+        private String timezone;
+        private String screenSize;
+        private String clientIp;
+        private String submittedAt;
+    }
+
+    public enum LinkSubmitType {
         add,
         update;
     }
 
-    public static enum LinkSubmitStatus {
+    public enum ReviewStatus {
         review,
         pending,
         refuse;
     }
-
-
 }

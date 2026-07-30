@@ -4,7 +4,7 @@ metadata:
   name: admin-link-submit
   annotations:
     rbac.authorization.halo.run/ui-permissions: |
-      [ "plugin:link:submit:manage" ]
+      [ "plugin:link:submit-next:manage" ]
 spec:
   displayName: "友链自助提交通知管理员"
   description: "有提交的友链通知管理员"

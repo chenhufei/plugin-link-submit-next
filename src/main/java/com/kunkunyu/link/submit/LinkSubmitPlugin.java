@@ -34,7 +34,7 @@ public class LinkSubmitPlugin extends BasePlugin {
             );
             indexSpecs.add(IndexSpecs.<LinkSubmit, String>single("spec.displayName", String.class)
                 .indexFunc(post -> Optional.ofNullable(post.getSpec())
-                    .map(LinkSubmit.LinkSubmitSpec::getDescription)
+                    .map(LinkSubmit.LinkSubmitSpec::getDisplayName)
                     .orElse(null)
                 )
             );
@@ -50,7 +50,7 @@ public class LinkSubmitPlugin extends BasePlugin {
                     .orElse(null)
                 )
             );
-            indexSpecs.add(IndexSpecs.<LinkSubmit, LinkSubmit.LinkSubmitStatus>single("spec.status", LinkSubmit.LinkSubmitStatus.class)
+            indexSpecs.add(IndexSpecs.<LinkSubmit, LinkSubmit.ReviewStatus>single("spec.status", LinkSubmit.ReviewStatus.class)
                 .indexFunc(post -> Optional.ofNullable(post.getSpec())
                     .map(LinkSubmit.LinkSubmitSpec::getStatus)
                     .orElse(null)
