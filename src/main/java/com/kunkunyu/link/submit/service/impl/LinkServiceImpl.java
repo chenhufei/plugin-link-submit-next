@@ -1,9 +1,5 @@
 package com.kunkunyu.link.submit.service.impl;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.HashMap;
-import java.util.Map;
-
 import com.kunkunyu.link.submit.extension.Link;
 import com.kunkunyu.link.submit.extension.LinkGroup;
 import com.kunkunyu.link.submit.extension.LinkSubmit;
@@ -14,29 +10,25 @@ import com.kunkunyu.link.submit.vo.LinkGroupVo;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.domain.Sort;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import run.halo.app.extension.ListOptions;
 import run.halo.app.extension.Metadata;
 import run.halo.app.extension.ReactiveExtensionClient;
-import run.halo.app.extension.Unstructured;
 import run.halo.app.extension.router.selector.FieldSelector;
 
+import java.util.HashMap;
+
 import static org.springframework.data.domain.Sort.Order.asc;
-import static org.springframework.data.domain.Sort.Order.desc;
 
-
-@Service
+@Component
 @RequiredArgsConstructor
 public class LinkServiceImpl implements LinkService {
 
     private final ReactiveExtensionClient client;
 
     private final SettingConfigLinkSubmit settingConfigLinkSubmit;
-
-    private final ObjectMapper objectMapper = Unstructured.OBJECT_MAPPER;
-
 
     @Override
     public Mono<Link> getName(String name) {
@@ -50,7 +42,6 @@ public class LinkServiceImpl implements LinkService {
         return client.listAll(LinkGroup.class, listOptions, defaultLinkSort())
             .map(LinkGroupVo::from);
     }
-
 
     public Flux<Link> listLink() {
         var listOptions = new ListOptions();
@@ -67,7 +58,6 @@ public class LinkServiceImpl implements LinkService {
 
     @Override
     public Mono<Link> create(LinkSubmit linkSubmit) {
-
         var basicConfig = settingConfigLinkSubmit.getBasicConfig();
 
         return basicConfig.flatMap(basic -> {
@@ -80,17 +70,15 @@ public class LinkServiceImpl implements LinkService {
             spec.setDescription(linkSubmitSpec.getDescription());
             spec.setLogo(linkSubmitSpec.getLogo());
 
-            // 设置分组
             if (StringUtils.isEmpty(linkSubmitSpec.getGroupName())) {
                 spec.setGroupName(basic.getGroupName());
             } else {
                 spec.setGroupName(linkSubmitSpec.getGroupName());
             }
 
-            // 设置元数据
             Metadata metadata = new Metadata();
             metadata.setGenerateName("link-");
-            Map<String, String> annotations = new HashMap<>(3);
+            var annotations = new HashMap<String, String>();
             if (StringUtils.isNotEmpty(linkSubmitSpec.getEmail())) {
                 annotations.put("email", linkSubmitSpec.getEmail());
             }
@@ -101,40 +89,18 @@ public class LinkServiceImpl implements LinkService {
             link.setMetadata(metadata);
             link.setSpec(spec);
 
-            return createByUnstructured(link);
-        });
-    }
-
-    private Mono<Link> createByUnstructured(Link link) {
-        Map extensionMap = objectMapper.convertValue(link, Map.class);
-        var extension = new Unstructured(extensionMap);
-        return client.create(extension).flatMap(unstructured -> {
-            var linkNew = objectMapper.convertValue(unstructured, Link.class);
-            return Mono.just(linkNew);
-        });
-    }
-
-    public Mono<Link> delete(Link link) {
-        return deleteByUnstructured(link);
-    }
-
-    private Mono<Link> deleteByUnstructured(Link link) {
-        Map extensionMap = objectMapper.convertValue(link, Map.class);
-        var extension = new Unstructured(extensionMap);
-        return client.delete(extension).flatMap(unstructured -> {
-            var linkDel = objectMapper.convertValue(unstructured, Link.class);
-            return Mono.just(linkDel);
+            return client.create(link);
         });
     }
 
     @Override
+    public Mono<Link> delete(Link link) {
+        return client.delete(link);
+    }
+
+    @Override
     public Mono<Link> update(Link link) {
-        Map extensionMap = objectMapper.convertValue(link, Map.class);
-        var extension = new Unstructured(extensionMap);
-        return client.update(extension).flatMap(unstructured -> {
-            var linkNew = objectMapper.convertValue(unstructured, Link.class);
-            return Mono.just(linkNew);
-        });
+        return client.update(link);
     }
 
     static Sort defaultLinkSort() {

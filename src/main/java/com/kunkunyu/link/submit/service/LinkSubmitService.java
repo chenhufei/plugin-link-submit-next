@@ -11,7 +11,7 @@ public interface LinkSubmitService {
 
     Mono<ListResult<LinkSubmit>> listLinkSubmit(LinkSubmitQuery query);
 
-    Mono<LinkSubmit> createLinkSubmit(AnonymousEndpoint.CreateLinkSubmitRequest createLinkSubmitRequest);
+    Mono<LinkSubmit> createLinkSubmit(AnonymousEndpoint.CreateLinkSubmitRequest createLinkSubmitRequest, String clientIp);
 
     Mono<LinkSubmit> checkLink(String name, LinkSubmitEndpoint.CheckLinkSubmitRequest checkLinkSubmitRequest);
 }

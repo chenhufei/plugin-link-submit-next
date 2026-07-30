@@ -44,7 +44,7 @@ public class LinkSubmitWidgetFooterProcessor implements TemplateFooterProcessor 
                 if (!basicConfig.isLoadPlugInResources()) {
                     return;
                 }
-                if (!mismatchedRoute(context,"/links")) {
+                if (!isRouteMatched(context, "/links")) {
                     return;
                 }
                 IModelFactory modelFactory = context.getModelFactory();
@@ -59,16 +59,18 @@ public class LinkSubmitWidgetFooterProcessor implements TemplateFooterProcessor 
     private String linkSubmitWidgetScript(boolean displayTheSubmitButton) {
         String html = """
             <!-- LinkSubmitWidget start -->
-            <script src="/plugins/link-submit/assets/static/link-submit-widget.iife.js?version=${version}" defer></script>
-            <link rel="stylesheet" href="/plugins/link-submit/assets/static/var.css?version=${version}" />
+            <script src="/plugins/link-submit-next/assets/static/link-submit-widget.iife.js?version=${version}" defer></script>
+            <link rel="stylesheet" href="/plugins/link-submit-next/assets/static/var.css?version=${version}" />
             <!-- LinkSubmitWidget end -->
             """;
 
         if (displayTheSubmitButton) {
-            html += """ 
+            html += """
                 <button title="提交友链"
                     onclick="LinkSubmitWidget.open()"
-                    style="position: fixed; right: 2rem; bottom: 6rem; width: 3rem; height: 3rem; border-radius: 50%; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; transition: background-color 0.3s;"><svg
+                    style="position: fixed; right: 2rem; bottom: 6rem; width: 3rem; height: 3rem; border-radius: 50%; background-color: rgba(209, 62, 67, 0.9); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.3s; z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.2);"
+                    onmouseover="this.style.backgroundColor='rgba(209, 62, 67, 1)'"
+                    onmouseout="this.style.backgroundColor='rgba(209, 62, 67, 0.9)'"><svg
                         viewBox="0 0 24 24" width="1.5em" height="1.5em">
                         <path fill="#fff"
                             d="M10.6 13.4a1 1 0 0 1-1.4 1.4a4.8 4.8 0 0 1 0-7l3.5-3.6a5.1 5.1 0 0 1 7.1 0a5.1 5.1 0 0 1 0 7.1l-1.5 1.5a6.4 6.4 0 0 0-.4-2.4l.5-.5a3.2 3.2 0 0 0 0-4.3a3.2 3.2 0 0 0-4.3 0l-3.5 3.6a2.9 2.9 0 0 0 0 4.2M23 18v2h-3v3h-2v-3h-3v-2h3v-3h2v3m-3.8-4.3a4.8 4.8 0 0 0-1.4-4.5a1 1 0 0 0-1.4 1.4a2.9 2.9 0 0 1 0 4.2l-3.5 3.6a3.2 3.2 0 0 1-4.3 0a3.2 3.2 0 0 1 0-4.3l.5-.4a7.3 7.3 0 0 1-.4-2.5l-1.5 1.5a5.1 5.1 0 0 0 0 7.1a5.1 5.1 0 0 0 7.1 0l1.8-1.8a6 6 0 0 1 3.1-4.3">
@@ -83,7 +85,7 @@ public class LinkSubmitWidgetFooterProcessor implements TemplateFooterProcessor 
         return PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(html, properties);
     }
 
-    public boolean mismatchedRoute(ITemplateContext context, String rule) {
+    public boolean isRouteMatched(ITemplateContext context, String rule) {
         if (!Contexts.isWebContext(context)) {
             return false;
         }

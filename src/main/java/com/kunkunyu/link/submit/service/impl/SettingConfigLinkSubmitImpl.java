@@ -1,6 +1,9 @@
 package com.kunkunyu.link.submit.service.impl;
 
 import com.kunkunyu.link.submit.service.SettingConfigLinkSubmit;
+import com.kunkunyu.link.submit.service.SettingConfigLinkSubmit.BasicGroupConfig;
+import com.kunkunyu.link.submit.service.SettingConfigLinkSubmit.LinkGroupConfig;
+import com.kunkunyu.link.submit.service.SettingConfigLinkSubmit.NotificationGroupConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
@@ -14,7 +17,37 @@ public class SettingConfigLinkSubmitImpl implements SettingConfigLinkSubmit {
 
     @Override
     public Mono<BasicConfig> getBasicConfig() {
-        return settingFetcher.fetch(BasicConfig.GROUP, BasicConfig.class)
-            .defaultIfEmpty(new BasicConfig());
+        return Mono.zip(
+                settingFetcher.fetch(BasicGroupConfig.GROUP, BasicGroupConfig.class)
+                    .defaultIfEmpty(new BasicGroupConfig()),
+                settingFetcher.fetch(NotificationGroupConfig.GROUP, NotificationGroupConfig.class)
+                    .defaultIfEmpty(new NotificationGroupConfig()),
+                settingFetcher.fetch(LinkGroupConfig.GROUP, LinkGroupConfig.class)
+                    .defaultIfEmpty(new LinkGroupConfig())
+            )
+            .map(tuple -> {
+                var basic = tuple.getT1();
+                var notification = tuple.getT2();
+                var link = tuple.getT3();
+
+                var config = new BasicConfig();
+                // basic group
+                config.setLoadPlugInResources(basic.isLoadPlugInResources());
+                config.setDisplayTheSubmitButton(basic.isDisplayTheSubmitButton());
+                config.setAutoAudit(basic.isAutoAudit());
+                config.setDailySubmitLimit(basic.getDailySubmitLimit());
+                config.setEnableHealthCheck(basic.isEnableHealthCheck());
+                config.setEnableLinkPreview(basic.isEnableLinkPreview());
+                // notification group
+                config.setSendEmail(notification.isSendEmail());
+                config.setAdminEmail(notification.getAdminEmail());
+                config.setEnableWebhook(notification.isEnableWebhook());
+                config.setWebhookUrl(notification.getWebhookUrl());
+                config.setWebhookSecret(notification.getWebhookSecret());
+                // link group
+                config.setGroupName(link.getGroupName());
+                config.setForbidSelectedGroupName(link.getForbidSelectedGroupName());
+                return config;
+            });
     }
 }

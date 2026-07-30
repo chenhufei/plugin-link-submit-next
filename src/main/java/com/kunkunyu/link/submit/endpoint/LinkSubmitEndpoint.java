@@ -28,7 +28,7 @@ import static org.springdoc.core.fn.builders.requestbody.Builder.requestBodyBuil
 @RequiredArgsConstructor
 public class LinkSubmitEndpoint implements CustomEndpoint {
 
-    private final String tag = "console.api.link.submit.kunkunyu.com/v1alpha1/ListLinkSubmit";
+    private static final String TAG = "console.api.link.submit.kunkunyu.com/v1alpha1/ListLinkSubmit";
 
     private final LinkSubmitService linkSubmitService;
 
@@ -38,7 +38,7 @@ public class LinkSubmitEndpoint implements CustomEndpoint {
             .GET("linksubmits", this::listLinkSubmits, builder -> {
                     builder.operationId("ListLinkSubmits")
                         .description("List LinkSubmits.")
-                        .tag(tag)
+                        .tag(TAG)
                         .response(responseBuilder()
                             .implementation(ListResult.generateGenericClass(LinkSubmit.class))
                         );
@@ -48,7 +48,7 @@ public class LinkSubmitEndpoint implements CustomEndpoint {
             .POST("linksubmits/{name}/check", this::check,
                 builder -> builder.operationId("check")
                     .description("友链提交审核操作")
-                    .tag(tag)
+                    .tag(TAG)
                     .parameter(parameterBuilder().name("name")
                         .in(ParameterIn.PATH)
                         .required(true)

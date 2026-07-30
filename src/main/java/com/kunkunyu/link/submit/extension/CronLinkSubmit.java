@@ -35,6 +35,7 @@ public class CronLinkSubmit extends AbstractExtension {
 
     @Data
     public static class CronLinkSubmitSpec {
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         private String cron;
         private boolean suspend;
         private CleanConfig cleanConfig = new CleanConfig();

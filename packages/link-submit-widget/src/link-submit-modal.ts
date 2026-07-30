@@ -53,6 +53,9 @@ export class LinkSubmitModal extends LitElement {
   @state()
   private selectedType = '';
 
+  @state()
+  private fetchingSite = false;
+
   constructor() {
     super();
     this.fetchGroups();
@@ -94,7 +97,7 @@ export class LinkSubmitModal extends LitElement {
 
   private async fetchGroups() {
     try {
-      const response = await fetch('/apis/anonymous.link.submit.kunkunyu.com/v1alpha1/linkgroups');
+      const response = await fetch('/apis/api.link.submit.kunkunyu.com/v1alpha1/linkgroups');
       if (!response.ok) {
         throw new Error('Failed to fetch groups');
       }
@@ -109,6 +112,62 @@ export class LinkSubmitModal extends LitElement {
   private handleTypeChange(e: Event) {
     const select = e.target as HTMLSelectElement;
     this.selectedType = select.value;
+  }
+
+  /**
+   * 根据网址获取网站信息（标题、描述、Logo）
+   * 调用插件后端代理端点，避免前端跨域问题和国内网络限制
+   */
+  private async fetchSiteInfo() {
+    const urlInput = this.shadowRoot?.querySelector('#input-url') as HTMLInputElement;
+    if (!urlInput || !urlInput.value.trim()) {
+      this.showToast('请先填写网址', 'error');
+      return;
+    }
+
+    let url = urlInput.value.trim();
+    if (!/^https?:\/\//i.test(url)) {
+      url = 'https://' + url;
+      urlInput.value = url;
+    }
+
+    this.fetchingSite = true;
+    try {
+      // 调用后端代理端点（服务端抓取，无 CORS 问题）
+      const apiUrl = `/apis/api.link.submit.kunkunyu.com/v1alpha1/site-info?url=${encodeURIComponent(url)}`;
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        this.showToast('获取网站信息失败，请手动填写', 'error');
+        return;
+      }
+      const data = await response.json() as { title?: string; description?: string; logo?: string };
+      if (data.title || data.description || data.logo) {
+        this.fillSiteInfo(data.title, data.logo, data.description);
+        this.showToast('已自动填充网站信息');
+      } else {
+        this.showToast('未能获取到网站信息，请手动填写', 'error');
+      }
+    } catch {
+      this.showToast('获取网站信息失败，请手动填写', 'error');
+    } finally {
+      this.fetchingSite = false;
+    }
+  }
+
+  private fillSiteInfo(title?: string, logo?: string, description?: string) {
+    const nameInput = this.shadowRoot?.querySelector('#input-name') as HTMLInputElement;
+    const logoInput = this.shadowRoot?.querySelector('#input-logo') as HTMLInputElement;
+    const descTextarea = this.shadowRoot?.querySelector('#textarea-description') as HTMLTextAreaElement;
+
+    if (title && nameInput && !nameInput.value.trim()) {
+      nameInput.value = title;
+    }
+    if (logo && logoInput && !logoInput.value.trim()) {
+      logoInput.value = logo;
+    }
+    if (description && descTextarea && !descTextarea.value.trim()) {
+      descTextarea.value = description;
+    }
   }
 
   private handleClose() {
@@ -131,11 +190,12 @@ export class LinkSubmitModal extends LitElement {
       email: formData.get('email'),
       groupName: formData.get('groupName'),
       rssUrl: formData.get('rssUrl'),
+      message: formData.get('message'),
       type: formData.get('type'),
     };
 
     try {
-      const response = await fetch('/apis/anonymous.link.submit.kunkunyu.com/v1alpha1/linksubmits/-/submit', {
+      const response = await fetch('/apis/api.link.submit.kunkunyu.com/v1alpha1/linksubmits/-/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -234,7 +294,18 @@ export class LinkSubmitModal extends LitElement {
             <div class="grid grid-cols-2 gap-4">
               <div class="flex flex-col gap-2">
                 <label for="input-url" class="form-label">网址</label>
-                <input type="url" name="url" id="input-url" placeholder="https://" required class="form-input">
+                <div class="flex gap-2">
+                  <input type="url" name="url" id="input-url" placeholder="https://" required class="form-input" style="flex:1;">
+                  <button
+                    type="button"
+                    class="form-button whitespace-nowrap"
+                    ?disabled=${this.fetchingSite}
+                    @click=${this.fetchSiteInfo}
+                  >
+                    ${this.fetchingSite ? '获取中...' : '获取信息'}
+                  </button>
+                </div>
+                <div class="text-sm text-form-placeholder">填写网址后点击「获取信息」，自动填充标题、Logo 和描述</div>
               </div>
               <div class="flex flex-col gap-2">
                 <label for="input-name" class="form-label">网站标题</label>
@@ -245,7 +316,7 @@ export class LinkSubmitModal extends LitElement {
             <div class="grid grid-cols-2 gap-4">
               <div class="flex flex-col gap-2">
                 <label for="input-logo" class="form-label">logo</label>
-                <input type="url" name="logo" id="input-logo" required class="form-input">
+                <input type="url" name="logo" id="input-logo" class="form-input" placeholder="可选，留空将自动获取">
               </div>
               <div class="flex flex-col gap-2">
                 <label for="input-url-rss" class="form-label">RSS地址</label>
@@ -256,6 +327,11 @@ export class LinkSubmitModal extends LitElement {
             <div class="flex flex-col gap-2">
               <label for="textarea-description" class="form-label">网站描述</label>
               <textarea id="textarea-description" name="description" rows="2" class="form-input"></textarea>
+            </div>
+
+            <div class="flex flex-col gap-2">
+              <label for="textarea-message" class="form-label">备注留言</label>
+              <textarea id="textarea-message" name="message" rows="2" class="form-input" placeholder="可选，向站长说明你的友链意图"></textarea>
             </div>
 
             ${this.selectedType === 'update' ? html`

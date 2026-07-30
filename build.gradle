@@ -5,6 +5,7 @@ plugins {
 }
 
 group 'com.kunkunyu.link.submit'
+version '1.0.6'
 
 repositories {
     mavenCentral()
@@ -14,12 +15,13 @@ repositories {
 }
 
 dependencies {
-    implementation platform('run.halo.tools.platform:plugin:2.22.0')
+    implementation platform('run.halo.tools.platform:plugin:2.24.0')
     implementation 'cn.hutool:hutool-all:5.8.25'
     compileOnly 'run.halo.app:api'
 
     testImplementation 'run.halo.app:api'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 test {
@@ -40,7 +42,7 @@ tasks.withType(JavaCompile).configureEach {
 tasks.register('processUiResources', Copy) {
     from project(':ui').layout.buildDirectory.dir('dist')
     into layout.buildDirectory.dir('resources/main/console')
-    dependsOn project(':ui').tasks.named('assemble')
+    dependsOn project(':ui').tasks.named('buildFrontend')
     shouldRunAfter tasks.named('processResources')
 }
 
@@ -66,7 +68,7 @@ halo {
     debug = true
     debugPort = 5005
 
-    containerName = 'link-submit'
+    containerName = 'link-submit-next'
     // 控制台会挂起，等待点击 Attach debugger 按钮
     suspend = true
 }

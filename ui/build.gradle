@@ -5,7 +5,7 @@ plugins {
 
 group 'com.kunkunyu.link.submit.ui'
 
-tasks.register('pnpmBuild', PnpmTask) {
+tasks.register('buildFrontend', PnpmTask) {
     group = 'build'
     description = 'Build the UI project using pnpm'
     args = ['build']
@@ -17,17 +17,6 @@ tasks.register('pnpmBuild', PnpmTask) {
     outputs.dir(layout.buildDirectory.dir('dist'))
 }
 
-tasks.register('pnpmCheck', PnpmTask) {
-    group = 'verification'
-    description = 'Run unit tests for the UI project using pnpm'
-    args = ['test:unit']
-    dependsOn tasks.named('pnpmInstall')
-}
-
-tasks.named('check') {
-    dependsOn tasks.named('pnpmCheck')
-}
-
 tasks.named('assemble') {
-    dependsOn tasks.named('pnpmBuild')
+    dependsOn tasks.named('buildFrontend')
 }

@@ -18,13 +18,12 @@
     "tabWidth": 2
   },
   "dependencies": {
-    "@halo-dev/api-client": "^2.21.1",
-    "@halo-dev/components": "^2.21.0",
-    "@halo-dev/ui-shared": "https://pkg.pr.new/@halo-dev/ui-shared@8003",
+    "@halo-dev/api-client": "^2.25.0",
+    "@halo-dev/components": "^2.25.0",
+    "@halo-dev/ui-shared": "^2.25.2",
     "axios": "^1.7.2",
     "vue": "^3.4.31",
-    "@tanstack/vue-query": "^4.26.1",
-    "javascript-time-ago": "^2.5.9",
+    "@tanstack/vue-query": "^4.44.0",
     "@formkit/core": "^1.4.0",
     "@vueuse/router": "^10.6.0",
     "pinia": "^3.0.4"

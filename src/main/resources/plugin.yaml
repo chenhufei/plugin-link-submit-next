@@ -1,25 +1,26 @@
 apiVersion: plugin.halo.run/v1alpha1
 kind: Plugin
 metadata:
-  name: link-submit
+  name: link-submit-next
   annotations:
-    "store.halo.run/app-id": "app-glejqzwk"
+    "store.halo.run/app-id": "app-link-submit-next"
 spec:
-  enabled: true
+  enabled: false
   requires: ">=2.22.1"
   pluginDependencies:
     "PluginLinks": ">=2.0.0"
+  version: "1.0.6"
   author:
-    name: 困困鱼
-    website: https://github.com/chengzhongxue
+    name: chenhufei
+    website: https://github.com/chenhufei
   logo: logo.svg
-  configMapName: link-submit-configMap
-  settingName: link-submit-settings
-  homepage: https://www.halo.run/store/apps/app-glejqzwk
-  repo: https://github.com/chengzhongxue/link-submit
-  issues: https://github.com/chengzhongxue/link-submit/issues
-  displayName: "友链自助提交插件"
+  homepage: https://github.com/chenhufei/plugin-link-submit-next
+  repo: https://github.com/chenhufei/plugin-link-submit-next
+  issues: https://github.com/chenhufei/plugin-link-submit-next/issues
+  configMapName: link-submit-next-configmap
+  settingName: link-submit-next-settings
+  displayName: "友链自助提交 Next"
   description: "访问者可以自助提交友链，并在后台管理页面进行审核。"
   license:
     - name: "GPL-3.0"
-      url: "https://github.com/chengzhongxue/link-submit/blob/main/LICENSE"
+      url: "https://www.gnu.org/licenses/gpl-3.0.html"
