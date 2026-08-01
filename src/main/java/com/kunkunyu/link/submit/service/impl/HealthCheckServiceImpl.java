@@ -4,6 +4,7 @@ import com.kunkunyu.link.submit.extension.Link;
 import com.kunkunyu.link.submit.extension.LinkSubmit;
 import com.kunkunyu.link.submit.service.HealthCheckService;
 import com.kunkunyu.link.submit.utils.LinkUtil;
+import com.kunkunyu.link.submit.utils.SafeUrlValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
@@ -32,12 +33,13 @@ public class HealthCheckServiceImpl implements HealthCheckService {
             status.setLastCheckedAt(Instant.now());
 
             try {
+                SafeUrlValidator.requirePublicHttpUrl(url);
                 long startTime = System.currentTimeMillis();
                 HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
                 connection.setRequestMethod("GET");
                 connection.setConnectTimeout(5000);
                 connection.setReadTimeout(10000);
-                connection.setInstanceFollowRedirects(true);
+                connection.setInstanceFollowRedirects(false);
                 connection.setRequestProperty("User-Agent",
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
 
@@ -75,8 +77,10 @@ public class HealthCheckServiceImpl implements HealthCheckService {
     public Mono<Boolean> detectHiddenLink(String url, String ownDomain) {
         return Mono.fromCallable(() -> {
             try {
+                SafeUrlValidator.requirePublicHttpUrl(url);
                 java.net.HttpURLConnection connection = (java.net.HttpURLConnection) new URL(url).openConnection();
                 connection.setRequestMethod("GET");
+                connection.setInstanceFollowRedirects(false);
                 connection.setConnectTimeout(5000);
                 connection.setReadTimeout(10000);
                 connection.setRequestProperty("User-Agent",

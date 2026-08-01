@@ -6,10 +6,10 @@ metadata:
     "store.halo.run/app-id": "app-link-submit-next"
 spec:
   enabled: false
-  requires: ">=2.22.1"
+  requires: ">=2.25.0"
   pluginDependencies:
     "PluginLinks": ">=2.0.0"
-  version: "1.0.6"
+  version: "1.0.9"
   author:
     name: chenhufei
     website: https://github.com/chenhufei

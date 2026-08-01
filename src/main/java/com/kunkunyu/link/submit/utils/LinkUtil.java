@@ -31,12 +31,17 @@ public class LinkUtil {
 
     @Deprecated
     public static String getFavicon(String url) {
+        SafeUrlValidator.requirePublicHttpUrl(url);
         if (!url.startsWith(HTTP_PROTOCOL) && !url.startsWith(HTTPS_PROTOCOL)) {
             url = HTTP_PROTOCOL + url;
         }
         String html;
         try {
-            html = HttpUtil.get(url);
+            html = HttpRequest.get(url)
+                .setConnectionTimeout(3000)
+                .setReadTimeout(5000)
+                .setFollowRedirects(false)
+                .execute().body();
         } catch (Exception e) {
             log.warn("Failed to fetch favicon for {}: {}", url, e.getMessage());
             return null;
@@ -62,10 +67,12 @@ public class LinkUtil {
     private static int getFaviconSize(String faviconUrl) {
         int contentLength = 0;
         try {
-            final URL url = new URL(faviconUrl);
+            final URL url = SafeUrlValidator.requirePublicHttpUrl(faviconUrl).toURL();
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod(HttpMethod.GET.name());
-            connection.setDoOutput(true);
+            connection.setConnectTimeout(3000);
+            connection.setReadTimeout(5000);
+            connection.setDoOutput(false);
             connection.setInstanceFollowRedirects(false);
             contentLength = connection.getContentLength();
             log.debug("Favicon size: {}", contentLength);
@@ -87,12 +94,17 @@ public class LinkUtil {
     }
 
     public static boolean hasLinkByHtml(String url, String domainName) {
+        SafeUrlValidator.requirePublicHttpUrl(url);
         if (!url.startsWith(HTTP_PROTOCOL) && !url.startsWith(HTTPS_PROTOCOL)) {
             url = HTTP_PROTOCOL + url;
         }
         String html;
         try {
-            html = HttpUtil.get(url);
+            html = HttpRequest.get(url)
+                .setConnectionTimeout(3000)
+                .setReadTimeout(5000)
+                .setFollowRedirects(false)
+                .execute().body();
         } catch (Exception e) {
             log.warn("Failed to fetch page for link check: {}", url, e.getMessage());
             return false;
@@ -122,22 +134,17 @@ public class LinkUtil {
     }
 
     public static boolean isValidUrl(String urlString) {
-        try {
-            URI uri = new URI(urlString);
-            if (uri.getHost() == null) {
-                return false;
-            }
-            String scheme = uri.getScheme();
-            return scheme != null && (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"));
-        } catch (URISyntaxException e) {
-            log.debug("Invalid URL syntax: {}", urlString);
-            return false;
-        }
+        return SafeUrlValidator.isPublicHttpUrl(urlString);
     }
 
     public static boolean urlChecker(String url) {
         try {
-            HttpResponse response = HttpRequest.get(url).setConnectionTimeout(3000).execute();
+            SafeUrlValidator.requirePublicHttpUrl(url);
+            HttpResponse response = HttpRequest.get(url)
+                .setConnectionTimeout(3000)
+                .setReadTimeout(5000)
+                .setFollowRedirects(false)
+                .execute();
             int statusCode = response.getStatus();
             return statusCode == 200 || statusCode == 301 || statusCode == 302;
         } catch (Exception e) {

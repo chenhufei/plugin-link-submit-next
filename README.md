@@ -1,58 +1,25 @@
-# link-submit
-- 支持自助提交和修改友链
+# Plugin Link Submit Next
 
-## 致谢
-该插件部分代码由 [柳意梧情](https://github.com/liuyiwuqing) 提供
+> 基于 `chengzhongxue/link-submit` 二次开发的 Halo 友链提交插件升级版。
 
-## 📃文档
-https://docs.kunkunyu.com/docs/link-submit
+## ✨ 核心优化与特性
 
+- **跨域(CORS)请求解决**：内置 `/site-info` 后端代理接口。当用户提交网站链接时，由后端代为请求目标网站获取标题、描述等 Meta 信息，彻底解决前端直接 Fetch 导致的跨域拦截问题。
+- **UI 交互升级**：优化了提交表单的交互体验，使其更符合现代主题的风格。
+- **后台管理**：支持管理员在 Halo 后台中审批和管理访客提交的友情链接。
 
-## 交流群
-* 添加企业微信 （备注进群）
-  <img width="360" src="https://api.minio.yyds.pink/kunkunyu/files/2025/02/%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20250212142105-pbceif.jpg" />
+## 📦 安装与使用
 
-* QQ群
-  <img width="360" src="https://api.minio.yyds.pink/kunkunyu/files/2025/05/qq-708998089-iqowsh.webp" />
+1. 下载最新版本的 `.jar` 插件包。
+2. 在 Halo 后台的 **插件管理** 页面上传并启用该插件。
+3. 在友链页面（或指定页面）使用短代码/组件渲染友链提交表单。
 
-## 主题适配
+## 🛠️ 开发指南
 
-- 插件适配了友链页面提交按钮，如果不满意可以自己根据api来适配
+```bash
+# 编译并构建插件包
+./gradlew build
 
-### 调用搜索弹框
-
-此插件是一个通用的提交友链框插件，主题需要做的只是通过 JS API 唤起提交友链框即可，以下是代码示例：
-
-```html
-<div th:if="${pluginFinder.available('link-submit')}">
-    <a href="javascript:LinkSubmitWidget.open()" title="提交友链">
-        提交友链
-    </a>
-</div>
+# 插件打包产物位于
+# build/libs/plugin-link-submit-next-x.x.x.jar
 ```
-
-其中，`pluginFinder.available('link-submit')` 的作用是判断使用者是否安装和启用了此插件，如果没有安装或者没有启用，那么就不会显示提交友链入口。
-
-
-### 自定义样式
-
-虽然目前不能直接为提交友链组件编写额外的样式，但可以通过一系列的 CSS 变量来自定义部分样式，开发者可以根据需求自行在主题中添加这些 CSS 变量，让提交友链组件和主题更好地融合。
-
-目前已提供的 CSS 变量：
-
-| 变量名                                              | 描述              |
-|-----------------------------------------------------|-----------------|
-| `--link-submit-widget-base-font-size`               | 基础字体大小       |
-| `--link-submit-widget-base-font-family`             | 字体              |
-| `--link-submit-widget-base-rounded`                 | 边框圆角           |
-| `--link-submit-widget-base-bg-color`                | 基础背景色         |
-| `--link-submit-widget-modal-layer-color`            | 模态框遮挡层背景色 |
-| `--link-submit-widget-form-bg-color`                | 表单背景色         |
-| `--link-submit-widget-form-border-color`            | 表单边框色         |
-| `--link-submit-widget-form-text-color`              | 表单文本色         |
-| `--link-submit-widget-form-label-color`             | 表单标签色         |
-| `--link-submit-widget-form-placeholder-color`       | 表单占位符色       |
-| `--link-submit-widget-form-button-bg-color`         | 按钮背景色         |
-| `--link-submit-widget-form-button-text-color`       | 按钮文本色         |
-| `--link-submit-widget-form-button-hover-bg-color`   | 按钮悬停背景色     |
-

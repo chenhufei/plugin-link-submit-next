@@ -6,6 +6,7 @@ import com.kunkunyu.link.submit.service.LinkSubmitService;
 import com.kunkunyu.link.submit.service.SettingConfigLinkSubmit;
 import com.kunkunyu.link.submit.utils.IpAddressUtils;
 import com.kunkunyu.link.submit.vo.LinkGroupVo;
+import com.kunkunyu.link.submit.utils.SafeUrlValidator;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import io.github.resilience4j.reactor.ratelimiter.operator.RateLimiterOperator;
@@ -162,16 +163,13 @@ public class AnonymousEndpoint implements CustomEndpoint {
 
         final String finalUrl = url;
         return Mono.fromCallable(() -> {
-            Document doc = Jsoup.connect(finalUrl)
-                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    + "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    + "Chrome/120.0.0.0 Safari/537.36")
-                .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-                .timeout(8000)
-                .followRedirects(true)
-                .ignoreContentType(true)
-                .ignoreHttpErrors(true)
-                .get();
+            SafeUrlValidator.requirePublicHttpUrl(finalUrl);
+            Document doc = fetchDocument(finalUrl)
+                .doc();
+            String documentUrl = doc.location();
+            if (documentUrl == null || documentUrl.isBlank()) {
+                documentUrl = finalUrl;
+            }
 
             String title = null;
             // 优先 og:title
@@ -198,18 +196,18 @@ public class AnonymousEndpoint implements CustomEndpoint {
             String logo = null;
             Element ogImage = doc.selectFirst("meta[property=og:image]");
             if (ogImage != null && !ogImage.attr("content").isBlank()) {
-                logo = absUrl(ogImage.attr("content").trim(), finalUrl);
+                logo = absUrl(ogImage.attr("content").trim(), documentUrl);
             }
             if (logo == null || logo.isEmpty()) {
                 Element iconLink = doc.selectFirst("link[rel~=icon]");
                 if (iconLink != null && !iconLink.attr("href").isBlank()) {
-                    logo = absUrl(iconLink.attr("href").trim(), finalUrl);
+                    logo = absUrl(iconLink.attr("href").trim(), documentUrl);
                 }
             }
             // 兜底 favicon
             if (logo == null || logo.isEmpty()) {
                 try {
-                    java.net.URL u = new java.net.URL(finalUrl);
+                    java.net.URL u = new java.net.URL(documentUrl);
                     logo = u.getProtocol() + "://" + u.getHost()
                         + (u.getPort() > 0 ? ":" + u.getPort() : "") + "/favicon.ico";
                 } catch (Exception ignored) {
@@ -224,14 +222,51 @@ public class AnonymousEndpoint implements CustomEndpoint {
         })
         .subscribeOn(Schedulers.boundedElastic())
         .flatMap(result -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(result))
+        .onErrorResume(IllegalArgumentException.class, e ->
+            ServerResponse.badRequest().bodyValue(Map.of(
+                "title", "URL 不可访问",
+                "status", 400,
+                "detail", e.getMessage())))
         .onErrorResume(e -> {
             log.warn("Failed to fetch site info for {}: {}", finalUrl, e.getMessage());
-            Map<String, String> empty = new HashMap<>();
-            empty.put("title", "");
-            empty.put("description", "");
-            empty.put("logo", "");
-            return ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(empty);
+            return ServerResponse.status(502).bodyValue(Map.of(
+                "title", "网站信息获取失败",
+                "status", 502,
+                "detail", "目标网站暂时无法访问"));
         });
+    }
+
+    private static FetchResult fetchDocument(String initialUrl) throws Exception {
+        String current = initialUrl;
+        for (int redirect = 0; redirect < 4; redirect++) {
+            SafeUrlValidator.requirePublicHttpUrl(current);
+            var response = Jsoup.connect(current)
+                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+                .timeout(8000)
+                .followRedirects(false)
+                .ignoreContentType(true)
+                .ignoreHttpErrors(true)
+                .execute();
+            int status = response.statusCode();
+            if (status >= 300 && status < 400) {
+                String location = response.header("Location");
+                if (location == null || location.isBlank()) {
+                    throw new IllegalArgumentException("目标网站重定向地址为空");
+                }
+                current = SafeUrlValidator.requirePublicHttpUrl(
+                    java.net.URI.create(current).resolve(location).toString()).toString();
+                continue;
+            }
+            if (status < 200 || status >= 400) {
+                throw new java.io.IOException("目标网站返回 HTTP " + status);
+            }
+            return new FetchResult(response.parse());
+        }
+        throw new IllegalArgumentException("目标网站重定向次数过多");
+    }
+
+    private record FetchResult(Document doc) {
     }
 
     /** 将相对 URL 转为绝对 URL */

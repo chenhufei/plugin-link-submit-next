@@ -42,17 +42,20 @@ watch(
   () => [selectedSort.value, keyword.value, selectedStatus.value, selectedType.value],
   () => {
     page.value = 1;
+    selectedLinkSubmits.value = [];
+    checkedAll.value = false;
   }
 );
 
 function handleClearFilters() {
+  keyword.value = "";
   selectedSort.value = undefined;
   selectedStatus.value = undefined;
   selectedType.value = undefined;
 }
 
 const hasFilters = computed(() => {
-  return selectedSort.value || selectedStatus.value || selectedType.value;
+  return Boolean(keyword.value.trim() || selectedSort.value || selectedStatus.value || selectedType.value);
 });
 
 const {
@@ -302,10 +305,14 @@ const handleOpenCheckModal = (linkSubmit?: LinkSubmit) => {
             <VEntityField>
               <template #description>
                 <img
-                  :src="linkSubmit?.spec.logo"
+                  v-if="linkSubmit?.spec.logo"
+                  :src="linkSubmit.spec.logo"
                   :alt="linkSubmit?.spec.displayName"
                   class=":uno: h-10 w-10 rounded-full object-cover"
                 />
+                <span v-else class=":uno: flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm text-gray-500">
+                  {{ linkSubmit?.spec.displayName?.slice(0, 1) || '?' }}
+                </span>
               </template>
             </VEntityField>
             <VEntityField

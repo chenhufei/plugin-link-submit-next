@@ -11,8 +11,11 @@ metadata:
     rbac.authorization.halo.run/display-name: "PluginLinkSubmit Anonymous AccessRole"
 rules:
   - apiGroups: [ "api.link.submit.kunkunyu.com" ]
-    resources: [ "*" ]
-    verbs: [ "*" ]
+    resources: [ "linkgroups", "site-info" ]
+    verbs: [ "get", "list" ]
+  - apiGroups: [ "api.link.submit.kunkunyu.com" ]
+    resources: [ "linksubmits" ]
+    verbs: [ "create" ]
 
 
 ---
