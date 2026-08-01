@@ -16,6 +16,8 @@ spec:
         - $formkit: switch
           if: $get(loadPlugInResources).value
           name: displayTheSubmitButton
+          id: displayTheSubmitButton
+          key: displayTheSubmitButton
           label: 显示提交按钮
           help: 显示页面提交按钮
           value: true
@@ -70,12 +72,16 @@ spec:
         - $formkit: text
           if: $get(enableWebhook).value === true
           name: webhookUrl
+          id: webhookUrl
+          key: webhookUrl
           label: Webhook URL
           help: 填写企业微信/钉钉/飞书机器人的 Webhook 地址
           validation: required|url
         - $formkit: text
           if: $get(enableWebhook).value === true
           name: webhookSecret
+          id: webhookSecret
+          key: webhookSecret
           label: Webhook 签名密钥
           help: 可选，用于验证 Webhook 请求
     - group: link

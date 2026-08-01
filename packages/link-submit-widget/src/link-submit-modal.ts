@@ -97,11 +97,19 @@ export class LinkSubmitModal extends LitElement {
 
   private async fetchGroups() {
     try {
-      const response = await fetch('/apis/api.link.submit.kunkunyu.com/v1alpha1/linkgroups');
-      if (!response.ok) {
-        throw new Error('Failed to fetch groups');
+      const response = await fetch('/apis/api.link.submit.kunkunyu.com/v1alpha1/linkgroups', {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      const text = await response.text();
+      let data: unknown;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error('友链分组接口返回格式错误');
       }
-      this.groups = await response.json();
+      if (!response.ok) throw new Error((data as ErrorResponse)?.detail || '友链分组加载失败');
+      this.groups = Array.isArray(data) ? data as LinkGroup[] : [];
     } catch (error) {
       console.error('Error fetching groups:', error);
     } finally {
@@ -199,11 +207,19 @@ export class LinkSubmitModal extends LitElement {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'application/json',
         },
+        credentials: 'same-origin',
         body: JSON.stringify(submitData),
       });
 
-      const result = await response.json();
+      const responseText = await response.text();
+      let result: unknown;
+      try {
+        result = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        throw new Error('提交接口返回格式错误');
+      }
 
       if (!response.ok) {
         const errorResponse = result as ErrorResponse;
@@ -236,6 +252,7 @@ export class LinkSubmitModal extends LitElement {
           <button 
             type="button" 
             tabindex="0" 
+            aria-label="关闭"
             class="text-xl text-form-label hover:text-form-text transition-colors"
             @click=${this.handleClose}
           >
@@ -254,7 +271,7 @@ export class LinkSubmitModal extends LitElement {
               />
             </svg>
           </button>
-          <h2 class="text-xl font-semibold text-form-text">提交网站</h2>
+          <h2 id="link-submit-modal-title" class="text-xl font-semibold text-form-text">提交网站</h2>
         </div>
         <div class="mt-6">
           <form class="flex flex-col gap-6" @submit=${this.handleSubmit}>
@@ -383,6 +400,9 @@ export class LinkSubmitModal extends LitElement {
   override render() {
     return html`<div
       class="modal__wrapper"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="link-submit-modal-title"
       style="${styleMap({ display: this.open ? 'flex' : 'none' })}"
     >
       <div class="modal__layer" @click="${this.handleClose}"></div>
