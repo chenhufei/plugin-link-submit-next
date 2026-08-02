@@ -9,7 +9,7 @@ export default definePlugin({
     {
       parentName: "ToolsRoot",
       route: {
-        path: "/link-submit-next",
+        path: "link-submit-next",
         name: "LinkSubmitPro",
         component: () => import("@/views/HomeView.vue"),
         meta: {
