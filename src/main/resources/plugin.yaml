@@ -9,7 +9,7 @@ spec:
   requires: ">=2.25.0"
   pluginDependencies:
     "PluginLinks": ">=2.0.0"
-  version: "1.0.11"
+  version: "1.0.12"
   author:
     name: chenhufei
     website: https://github.com/chenhufei

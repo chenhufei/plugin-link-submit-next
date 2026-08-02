@@ -363,28 +363,26 @@ const handleOpenCheckModal = (linkSubmit?: LinkSubmit) => {
                 </span>
               </template>
             </VEntityField>
-          </template>
-
-          <template #dropdownItems>
-            <VButton
-              v-if="linkSubmit.spec.status == LinkSubmitSpecStatusEnum.Pending"
-              v-permission="['plugin:link:submit-next:manage']"
-              v-tooltip="'审核此提交'"
-              type="secondary"
-              size="sm"
-              @click="handleOpenCheckModal(linkSubmit)"
-            >
-              审核
-            </VButton>
-            <VButton
-              v-permission="['plugin:link:submit-next:manage']"
-              v-tooltip="'删除此提交'"
-              type="danger"
-              size="sm"
-              @click="handleDelete(linkSubmit)"
-            >
-              删除
-            </VButton>
+            <VEntityField v-permission="['plugin:link:submit-next:manage']" class=":uno: min-w-[140px]">
+              <template #description>
+                <VSpace>
+                  <VButton
+                    v-if="linkSubmit.spec.status == LinkSubmitSpecStatusEnum.Pending"
+                    v-tooltip="'审核此提交'"
+                    type="secondary"
+                    size="sm"
+                    @click="handleOpenCheckModal(linkSubmit)"
+                  >审核</VButton>
+                  <VButton
+                    v-tooltip="'删除此提交'"
+                    type="danger"
+                    size="sm"
+                    ghost
+                    @click="handleDelete(linkSubmit)"
+                  >删除</VButton>
+                </VSpace>
+              </template>
+            </VEntityField>
           </template>
         </VEntity>
       </VEntityContainer>

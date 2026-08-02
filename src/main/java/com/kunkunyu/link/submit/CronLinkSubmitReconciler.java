@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -67,7 +68,7 @@ public class CronLinkSubmitReconciler implements Reconciler<Reconciler.Request> 
                 }
 
                 var spec = cronLinkSubmit.getSpec();
-                if (!spec.isSuspend()) {
+                if (spec == null || !spec.isSuspend()) {
                     return Result.doNotRetry();
                 }
 
@@ -84,7 +85,7 @@ public class CronLinkSubmitReconciler implements Reconciler<Reconciler.Request> 
             return Result.doNotRetry();
         }
 
-        if (!CronExpression.isValidExpression(cron)) {
+        if (cron == null || !CronExpression.isValidExpression(cron)) {
             log.error("Cron expression {} is invalid.", cron);
             return Result.doNotRetry();
         }
@@ -92,9 +93,16 @@ public class CronLinkSubmitReconciler implements Reconciler<Reconciler.Request> 
         Instant now = Instant.now(this.clock);
         CronExpression cronExp = CronExpression.parse(cron);
         var status = cronLinkSubmit.getStatus();
+        if (status == null) {
+            status = new CronLinkSubmit.CronLinkSubmitStatus();
+            cronLinkSubmit.setStatus(status);
+        }
         Instant lastScheduledTimestamp = status.getLastScheduledTimestamp();
         if (lastScheduledTimestamp == null) {
             lastScheduledTimestamp = cronLinkSubmit.getMetadata().getCreationTimestamp();
+        }
+        if (lastScheduledTimestamp == null) {
+            lastScheduledTimestamp = now;
         }
 
         ZonedDateTime nextFromNow = cronExp.next(now.atZone(zoneId));
@@ -130,7 +138,9 @@ public class CronLinkSubmitReconciler implements Reconciler<Reconciler.Request> 
 
         this.client.update(cronLinkSubmit);
         log.info("Scheduled at {} and next scheduled at {}", scheduleTimestamp, next);
-        return new Result(true, Duration.between(now, next));
+        return next == null
+            ? Result.doNotRetry()
+            : new Result(true, Duration.between(now, next));
     }
 
     private ZoneId parseZoneId() {
@@ -145,6 +155,10 @@ public class CronLinkSubmitReconciler implements Reconciler<Reconciler.Request> 
 
     private void cleanLinks(CronLinkSubmit.CronLinkSubmitSpec spec) {
         var cleanConfig = spec.getCleanConfig();
+        if (cleanConfig == null) {
+            log.warn("Skip scheduled link cleanup because cleanConfig is missing");
+            return;
+        }
         Optional<SettingConfigLinkSubmit.BasicConfig> basicConfig =
             settingConfigLinkSubmit.getBasicConfig().blockOptional();
 
@@ -158,7 +172,8 @@ public class CronLinkSubmitReconciler implements Reconciler<Reconciler.Request> 
     private void processLink(Link link, CronLinkSubmit.CleanConfig cleanConfig,
         Optional<SettingConfigLinkSubmit.BasicConfig> basicConfig) {
         var linkGroupName = link.getSpec().getGroupName();
-        var withoutCheckGroupNames = cleanConfig.getWithoutCheckGroupNames();
+        var withoutCheckGroupNames = Optional.ofNullable(cleanConfig.getWithoutCheckGroupNames())
+            .orElseGet(List::of);
         var moveGroupName = cleanConfig.getMoveGroupName();
         var type = cleanConfig.getType();
 
