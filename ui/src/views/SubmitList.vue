@@ -23,6 +23,7 @@ import { axiosInstance } from "@halo-dev/api-client";
 import type { LinkGroup, LinkGroupList } from "@/domain";
 import { linkSubmitStatusOptions, linkSubmitTypeOptions } from "@/constant";
 import CheckModal from "@/components/CheckModal.vue";
+import ListFilterSelect from "@/components/ListFilterSelect.vue";
 import { utils } from "@halo-dev/ui-shared";
 
 const queryClient = useQueryClient();
@@ -234,7 +235,7 @@ const handleOpenCheckModal = (linkSubmit?: LinkSubmit) => {
               v-if="hasFilters"
               @click="handleClearFilters"
             />
-            <FilterDropdown
+            <ListFilterSelect
               v-model="selectedStatus"
               label="状态"
               :items="[
@@ -245,7 +246,7 @@ const handleOpenCheckModal = (linkSubmit?: LinkSubmit) => {
                 ...linkSubmitStatusOptions
               ]"
             />
-            <FilterDropdown
+            <ListFilterSelect
               v-model="selectedType"
               label="类型"
               :items="[
@@ -256,17 +257,15 @@ const handleOpenCheckModal = (linkSubmit?: LinkSubmit) => {
                 ...linkSubmitTypeOptions
               ]"
             />
-            <div class=":uno: flex flex-row gap-2">
-              <div
-                class=":uno: group cursor-pointer rounded p-1 hover:bg-gray-200"
-                @click="refetch()"
-              >
+            <div class=":uno: flex flex-row items-end gap-2">
+              <VButton v-tooltip="'刷新'" size="sm" ghost @click="refetch()">
+                <template #icon>
                 <IconRefreshLine
-                  v-tooltip="'刷新'"
-                  :class="{ 'animate-spin text-gray-900': isFetching }"
-                  class=":uno: h-4 w-4 text-gray-600 group-hover:text-gray-900"
+                  :class="{ 'animate-spin': isFetching }"
+                  class=":uno: h-4 w-4"
                 />
-              </div>
+                </template>
+              </VButton>
             </div>
           </VSpace>
         </div>
@@ -391,7 +390,7 @@ const handleOpenCheckModal = (linkSubmit?: LinkSubmit) => {
       </VEntityContainer>
     </Transition>
 
-    <template #footer>
+    <template v-if="total > 0" #footer>
       <VPagination
         v-model:page="page"
         v-model:size="size"
