@@ -1,87 +1,83 @@
 <script lang="ts" setup>
-import {Toast, VButton} from "@halo-dev/components";
-import {ref, nextTick} from "vue";
+import { linkSubmitCoreApiClient } from "@/api";
 import type { CronLinkSubmit } from "@/api/generated";
-import {linkSubmitCoreApiClient} from "@/api";
-import {axiosInstance} from "@halo-dev/api-client";
-import type {LinkGroupList} from "@/domain";
-import {useMutation, useQuery} from "@tanstack/vue-query";
+import type { LinkGroupList } from "@/domain";
+import { axiosInstance } from "@halo-dev/api-client";
+import { Toast, VAlert, VDescription, VDescriptionItem } from "@halo-dev/components";
+import { utils } from "@halo-dev/ui-shared";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { computed, ref } from "vue";
 
-const CRON_LINK_SUBMIT_NAME = "cron-link-submit-default"
+const TASK_NAME = "cron-link-submit-default";
 
-const formState = ref<CronLinkSubmit>({
-  metadata: {
-    name: CRON_LINK_SUBMIT_NAME,
-    creationTimestamp: ""
-  },
-  spec: {
-    cron: "@daily",
-    suspend: false,
-    cleanConfig: {
-      type: "delete",
-      withoutCheckGroupNames: [],
-      moveGroupName: ""
+function createDefaultTask(): CronLinkSubmit {
+  return {
+    metadata: { name: TASK_NAME },
+    spec: {
+      cron: "@daily",
+      suspend: false,
+      cleanConfig: {
+        type: "delete",
+        withoutCheckGroupNames: [],
+        moveGroupName: "",
+      },
     },
+    kind: "CronLinkSubmit",
+    apiVersion: "link.submit.kunkunyu.com/v1alpha1",
+  };
+}
+
+const formState = ref<CronLinkSubmit>(createDefaultTask());
+const taskExists = computed(() => Boolean(formState.value.metadata.creationTimestamp));
+const enabled = computed({
+  get: () => Boolean(formState.value.spec.suspend),
+  set: (value: boolean) => {
+    formState.value.spec.suspend = value;
   },
-  kind: "CronLinkSubmit",
-  apiVersion: "link.submit.kunkunyu.com/v1alpha1",
 });
 
-const {isLoading: cronIsLoading, isFetching: cronIsFetching} = useQuery({
+const { isLoading, isFetching } = useQuery({
   queryKey: ["cron-link-submit"],
   queryFn: async () => {
-    const {data} = await linkSubmitCoreApiClient.cronLinkSubmit.getCronLinkSubmit({
-      name: CRON_LINK_SUBMIT_NAME
-    },{
-      mute: true
-    });
-    return data;
+    const { data } = await linkSubmitCoreApiClient.cronLinkSubmit.listCronLinkSubmit(
+      { page: 1, size: 100 },
+      { mute: true }
+    );
+    return data.items.find((item) => item.metadata.name === TASK_NAME);
   },
-  onSuccess(data) {
-    formState.value =  data
+  onSuccess(task) {
+    formState.value = task || createDefaultTask();
   },
-  retry: false
-})
-
-const { mutate:save, isLoading:saveIsLoading } = useMutation({
-  mutationKey: ["cron-link-submit-save"],
-  mutationFn: async () => {
-    if (formState.value.metadata.creationTimestamp) {
-      const { data: data } = await linkSubmitCoreApiClient.cronLinkSubmit.getCronLinkSubmit({
-        name: CRON_LINK_SUBMIT_NAME
-      });
-      formState.value = {
-        ...formState.value,
-        status: data.status,
-        metadata: data.metadata
-      };
-      return await linkSubmitCoreApiClient.cronLinkSubmit.updateCronLinkSubmit({
-        name: CRON_LINK_SUBMIT_NAME,
-        cronLinkSubmit: formState.value
-      });
-    }else {
-      return await linkSubmitCoreApiClient.cronLinkSubmit.createCronLinkSubmit({
-        cronLinkSubmit: formState.value
-      });
-    }
-  },
-  onSuccess(data) {
-    formState.value = data.data
-    Toast.success("保存成功");
-  }
+  retry: false,
 });
 
+const { mutate: save, isLoading: isSaving } = useMutation({
+  mutationKey: ["cron-link-submit-save"],
+  mutationFn: async () => {
+    if (taskExists.value) {
+      return linkSubmitCoreApiClient.cronLinkSubmit.updateCronLinkSubmit({
+        name: TASK_NAME,
+        cronLinkSubmit: formState.value,
+      });
+    }
+    return linkSubmitCoreApiClient.cronLinkSubmit.createCronLinkSubmit({
+      cronLinkSubmit: formState.value,
+    });
+  },
+  onSuccess(response) {
+    formState.value = response.data;
+    Toast.success("定时任务已保存");
+  },
+  onError() {
+    Toast.error("定时任务保存失败，请稍后重试");
+  },
+});
 
 const handleSelectGroupRemote = {
   search: async ({ keyword, page, size }: { keyword: string; page: number; size: number }) => {
     const { data } = await axiosInstance.get<LinkGroupList>(
-      `/apis/core.halo.run/v1alpha1/linkgroups`,{
-        params: {
-          page: page,
-          size: size,
-          keyword: keyword,
-        },
-      }
+      "/apis/core.halo.run/v1alpha1/linkgroups",
+      { params: { page, size, keyword } }
     );
     return {
       options: data.items.map((item) => ({
@@ -93,103 +89,101 @@ const handleSelectGroupRemote = {
       size: data.size,
     };
   },
-  findOptionsByValues: () => {
-    return [];
-  },
+  findOptionsByValues: () => [],
 };
 
-const cronOptions = [{
-  label: "每月（每月 1 号 0 点）",
-  value: "@monthly"
-}, {
-  label: "每周（每周第一天 的 0 点）",
-  value: "@weekly"
-}, {
-  label: "每天（每天的 0 点）",
-  value: "@daily"
-}, {
-  label: "每小时",
-  value: "@hourly"
-}]
+const cronOptions = [
+  { label: "每月（每月 1 日 0 点）", value: "@monthly" },
+  { label: "每周（每周一 0 点）", value: "@weekly" },
+  { label: "每天（每天 0 点）", value: "@daily" },
+  { label: "每小时", value: "@hourly" },
+];
 
+function formatTime(value?: string) {
+  return value ? utils.date.format(value) : "尚未执行";
+}
 </script>
 
 <template>
-  <Transition mode="out-in" name="fade">
-    <div class=":uno: bg-white p-4">
-      <div>
+  <div class=":uno: space-y-4 p-4">
+    <VAlert
+      type="info"
+      title="定时检查正式友链"
+      description="任务仅消费 Halo 官方链接插件的数据；默认关闭，启用后按设定周期检查无法访问的友链。"
+      :closable="false"
+    />
+
+    <FormKit
+      id="cron-setting"
+      type="form"
+      :actions="false"
+      :disabled="isFetching"
+      @submit="save"
+    >
+      <FormKit v-model="enabled" label="启用定时任务" type="switch" name="enabled" />
+      <FormKit
+        v-model="formState.spec.cron"
+        label="执行周期"
+        type="select"
+        name="cron"
+        allow-create
+        searchable
+        help="可选择常用周期，也可填写 Spring Cron 表达式"
+        validation="required"
+        :options="cronOptions"
+      />
+      <FormKit v-model="formState.spec.cleanConfig" type="group" name="cleanConfig">
         <FormKit
-          id="cron-setting"
-          name="cron-setting"
-          :preserve="true"
-          type="form"
-          :disabled="cronIsFetching"
-          @submit="save"
-        >
-          <FormKit
-            v-model="formState.spec.suspend"
-            label="是否启用"
-            type="checkbox"
-            name="suspend"
-          ></FormKit>
-          <FormKit
-            v-model="formState.spec.cron"
-            label="定时表达式"
-            type="select"
-            name="cron"
-            allow-create
-            searchable
-            help="定时表达式规则请参考：https://docs.spring.io/spring-framework/reference/integration/scheduling.html#scheduling-cron-expression"
-            validation="required"
-            :options="cronOptions"
-          ></FormKit>
-          <FormKit type="group" label="定时清理无效友链设置" v-model="formState.spec.cleanConfig">
-            <FormKit
-              :options="[
-                { label: '删除', value: 'delete'},
-                { label: '移动（需设置无效友链分组）', value: 'move'},
-              ]"
-              name="type"
-              type="radio"
-              help="选择定时清理无效友链，执行的操作"
-              validation="required"
-            ></FormKit>
-            <FormKit
-              type="select"
-              label="友链状态免校验分组"
-              name="withoutCheckGroupNames"
-              help="不需要校验的分组"
-              searchable
-              remote
-              multiple
-              :remote-option="handleSelectGroupRemote"
-            />
-            <FormKit
-              v-if="formState.spec.cleanConfig?.type == 'move'"
-              type="select"
-              label="无效友链分组"
-              name="moveGroupName"
-              help="检测无效的友链移动至的分组"
-              searchable
-              remote
-              :remote-option="handleSelectGroupRemote"
-              validation="required"
-            />
-          </FormKit>
-        </FormKit>
+          :options="[
+            { label: '删除', value: 'delete' },
+            { label: '移动到指定分组', value: 'move' },
+          ]"
+          name="type"
+          type="radio"
+          label="无效友链处理方式"
+          validation="required"
+        />
+        <FormKit
+          type="select"
+          label="免检查分组"
+          name="withoutCheckGroupNames"
+          help="这些分组中的友链不会参与定时检查"
+          searchable
+          remote
+          multiple
+          :remote-option="handleSelectGroupRemote"
+        />
+        <FormKit
+          v-if="formState.spec.cleanConfig?.type === 'move'"
+          type="select"
+          label="无效友链目标分组"
+          name="moveGroupName"
+          searchable
+          remote
+          :remote-option="handleSelectGroupRemote"
+          validation="required"
+        />
+      </FormKit>
+
+      <div v-permission="['plugin:link:submit-next:manage']" class=":uno: border-t border-gray-100 pt-4">
+        <FormKit
+          type="submit"
+          :label="isSaving ? '保存中...' : '保存'"
+          :disabled="isLoading || isSaving"
+        />
       </div>
-      <div v-permission="['plugin:link:submit-next:manage']" class=":uno: pt-5">
-        <div class=":uno: flex justify-start">
-          <VButton
-            :loading="saveIsLoading"
-            :disabled="cronIsLoading"
-            type="secondary"
-            @click="$formkit.submit('cron-setting')"
-          >
-            保存
-          </VButton>
-        </div>
-      </div>
+    </FormKit>
+
+    <div v-if="formState.status" class=":uno: rounded border border-gray-100 p-4">
+      <h3 class=":uno: mb-3 text-sm text-gray-900 font-medium">运行状态</h3>
+      <VDescription>
+        <VDescriptionItem label="上次执行">
+          {{ formatTime(formState.status.lastScheduledTimestamp) }}
+        </VDescriptionItem>
+        <VDescriptionItem label="下次执行">
+          {{ formState.status.nextSchedulingTimestamp ? utils.date.format(formState.status.nextSchedulingTimestamp) : "未计划" }}
+        </VDescriptionItem>
+      </VDescription>
     </div>
-  </Transition>
+  </div>
 </template>

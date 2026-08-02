@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import {markRaw, shallowRef} from "vue";
 import Cron from "@/views/Cron.vue";
 import { useRouteQuery } from "@vueuse/router";
 import LinkVariantPlus from "~icons/mdi/link-variant-plus";
@@ -11,21 +10,18 @@ import {
 } from "@halo-dev/components";
 import SubmitList from "@/views/SubmitList.vue";
 
-const tabs = shallowRef([
+const tabs = [
   {
     id: "submitList",
     label: "提交记录",
-    component: markRaw(SubmitList),
   },
   {
     id: "cron",
     label: "定时任务",
-    component: markRaw(Cron),
   }
+];
 
-]);
-
-const activeIndex = useRouteQuery<string>("tab", tabs.value[0].id);
+const activeIndex = useRouteQuery<string>("tab", tabs[0].id);
 
 </script>
 
@@ -37,20 +33,18 @@ const activeIndex = useRouteQuery<string>("tab", tabs.value[0].id);
     </template>
   </VPageHeader>
 
-  <div class=":uno: m-0 md:m-4">
-    <VCard :body-class="[':uno: !p-0']">
-      <template #header>
+  <div class=":uno: m-0 space-y-4 md:m-4">
+    <div class=":uno: border-b border-gray-100 bg-white px-4 py-2">
         <VTabbar
           v-model:active-id="activeIndex"
-          :items="tabs.map((item) => ({ id: item.id, label: item.label }))"
-          class=":uno: w-full !rounded-none"
+          :items="tabs"
+          class=":uno: w-full"
           type="outline"
-        ></VTabbar>
-      </template>
-      <div class=":uno: bg-white">
-        <SubmitList ref="submitList" v-if="activeIndex=='submitList'"/>
-        <Cron ref="cron" v-if="activeIndex=='cron'"/>
-      </div>
+        />
+    </div>
+    <SubmitList v-if="activeIndex === 'submitList'" />
+    <VCard v-else-if="activeIndex === 'cron'" :body-class="[':uno: !p-0']">
+      <Cron />
     </VCard>
   </div>
 
