@@ -10,8 +10,12 @@ import {
   VEntity,
   VEntityContainer,
   VEntityField,
+  VDropdownDivider,
+  VDropdownItem,
+  VStatusDot,
   Dialog,
   Toast,
+  IconExternalLinkLine,
   IconRefreshLine,
 } from "@halo-dev/components";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/vue-query";
@@ -55,9 +59,20 @@ function handleClearFilters() {
   selectedType.value = undefined;
 }
 
+function stopEventPropagation(event?: MouseEvent) {
+  event?.stopPropagation();
+}
+
 const hasFilters = computed(() => {
   return Boolean(keyword.value.trim() || selectedSort.value || selectedStatus.value || selectedType.value);
 });
+
+const sortOptions = [
+  { label: "最新提交", value: "metadata.creationTimestamp,desc" },
+  { label: "最早提交", value: "metadata.creationTimestamp,asc" },
+  { label: "名称 A-Z", value: "spec.displayName,asc" },
+  { label: "名称 Z-A", value: "spec.displayName,desc" },
+];
 
 const {
   data: linkSubmits,
@@ -115,17 +130,8 @@ function getGroup(groupName: string) {
   return linkGroup?.spec?.displayName || "未分组";
 }
 
-function getStatusType(status: string) {
-  switch (status) {
-    case "review":
-      return "success";
-    case "pending":
-      return "warning";
-    case "refuse":
-      return "danger";
-    default:
-      return "default";
-  }
+function getStatusState(status: string) {
+  return ({ review: "success", pending: "warning", refuse: "error" } as Record<string, "success" | "warning" | "error" | "default">)[status] || "default";
 }
 
 function getTypeType(type: string) {
@@ -206,6 +212,7 @@ const handleOpenCheckModal = (linkSubmit?: LinkSubmit) => {
   <CheckModal
     v-if="linkSubmitCheckModal && selectedLinkSubmit"
     :link-submit="selectedLinkSubmit"
+    :group-label="getGroup(selectedLinkSubmit.spec.groupName || '')"
     @close="linkSubmitCheckModal = false"
   />
   <VCard :body-class="[':uno: !p-0']">
@@ -228,6 +235,7 @@ const handleOpenCheckModal = (linkSubmit?: LinkSubmit) => {
             <SearchInput
               v-else
               v-model="keyword"
+              placeholder="搜索名称、地址或邮箱"
             />
           </div>
           <VSpace spacing="lg" class=":uno: flex-wrap">
@@ -256,6 +264,11 @@ const handleOpenCheckModal = (linkSubmit?: LinkSubmit) => {
                 },
                 ...linkSubmitTypeOptions
               ]"
+            />
+            <ListFilterSelect
+              v-model="selectedSort"
+              label="排序"
+              :items="sortOptions"
             />
             <div class=":uno: flex flex-row items-end gap-2">
               <VButton v-tooltip="'刷新'" size="sm" ghost @click="refetch()">
@@ -291,16 +304,16 @@ const handleOpenCheckModal = (linkSubmit?: LinkSubmit) => {
         <VEntity
           v-for="linkSubmit in linkSubmits"
           :key="linkSubmit.metadata.name"
+          :is-selected="selectedLinkSubmits.includes(linkSubmit.metadata.name)"
         >
+          <template #checkbox>
+            <input
+              v-model="selectedLinkSubmits"
+              :value="linkSubmit.metadata.name"
+              type="checkbox"
+            />
+          </template>
           <template #start>
-            <VEntityField v-permission="['plugin:link:submit-next:manage']">
-              <input
-                v-model="selectedLinkSubmits"
-                :value="linkSubmit.metadata.name"
-                type="checkbox"
-                class=":uno: h-4 w-4 rounded border-gray-300 text-indigo-600"
-              />
-            </VEntityField>
             <VEntityField>
               <template #description>
                 <img
@@ -315,74 +328,56 @@ const handleOpenCheckModal = (linkSubmit?: LinkSubmit) => {
               </template>
             </VEntityField>
             <VEntityField
-              :description="linkSubmit?.spec.displayName"
-            />
+              :title="linkSubmit?.spec.displayName"
+              :description="linkSubmit?.spec.url"
+              class=":uno: min-w-0 max-w-[32rem] cursor-pointer"
+              @click="handleOpenCheckModal(linkSubmit)"
+            >
+              <template #extra>
+                <a
+                  :href="linkSubmit?.spec.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class=":uno: text-gray-500 opacity-0 transition-opacity hover:text-gray-900 group-hover:opacity-100"
+                  @click="stopEventPropagation"
+                >
+                  <IconExternalLinkLine class=":uno: h-3.5 w-3.5" />
+                </a>
+              </template>
+            </VEntityField>
           </template>
 
           <template #end>
             <VEntityField>
               <template #description>
-                <a :href="linkSubmit?.spec.url" target="_blank" class=":uno: text-sm text-blue-600 hover:underline">
-                  {{ linkSubmit?.spec.url }}
-                </a>
+                <VStatusDot :state="getStatusState(linkSubmit?.spec.status)" :text="statusText(linkSubmit?.spec.status)" />
               </template>
             </VEntityField>
             <VEntityField>
               <template #description>
-                <span class=":uno: text-sm text-gray-500">{{ linkSubmit?.spec.description }}</span>
+                <VTag :type="getTypeType(linkSubmit?.spec.type)" size="sm">{{ typeText(linkSubmit?.spec.type) }}</VTag>
               </template>
             </VEntityField>
             <VEntityField>
               <template #description>
-                <span class=":uno: text-sm text-gray-500">{{ linkSubmit?.spec.email }}</span>
+                <span class=":uno: block max-w-[9rem] truncate text-sm text-gray-500">{{ getGroup(linkSubmit?.spec.groupName || '') }}</span>
               </template>
             </VEntityField>
-            <VEntityField>
+            <VEntityField v-if="linkSubmit?.metadata.creationTimestamp">
               <template #description>
-                <span class=":uno: text-sm text-gray-500">{{ getGroup(linkSubmit?.spec.groupName || '') }}</span>
+                <span
+                  v-tooltip="utils.date.format(linkSubmit.metadata.creationTimestamp)"
+                  class=":uno: whitespace-nowrap text-sm text-gray-500"
+                >{{ utils.date.timeAgo(linkSubmit.metadata.creationTimestamp) }}</span>
               </template>
             </VEntityField>
-            <VEntityField>
-              <template #description>
-                <VTag :type="getStatusType(linkSubmit?.spec.status)" size="sm">
-                  {{ statusText(linkSubmit?.spec.status) }}
-                </VTag>
-              </template>
-            </VEntityField>
-            <VEntityField>
-              <template #description>
-                <VTag :type="getTypeType(linkSubmit?.spec.type)" size="sm">
-                  {{ typeText(linkSubmit?.spec.type) }}
-                </VTag>
-              </template>
-            </VEntityField>
-            <VEntityField>
-              <template #description>
-                <span class=":uno: text-sm text-gray-500">
-                  {{ utils.date.format(linkSubmit?.metadata.creationTimestamp) }}
-                </span>
-              </template>
-            </VEntityField>
-            <VEntityField v-permission="['plugin:link:submit-next:manage']" class=":uno: min-w-[140px]">
-              <template #description>
-                <VSpace>
-                  <VButton
-                    v-if="linkSubmit.spec.status == LinkSubmitSpecStatusEnum.Pending"
-                    v-tooltip="'审核此提交'"
-                    type="secondary"
-                    size="sm"
-                    @click="handleOpenCheckModal(linkSubmit)"
-                  >审核</VButton>
-                  <VButton
-                    v-tooltip="'删除此提交'"
-                    type="danger"
-                    size="sm"
-                    ghost
-                    @click="handleDelete(linkSubmit)"
-                  >删除</VButton>
-                </VSpace>
-              </template>
-            </VEntityField>
+          </template>
+          <template #dropdownItems>
+            <VDropdownItem @click="handleOpenCheckModal(linkSubmit)">
+              {{ linkSubmit.spec.status == LinkSubmitSpecStatusEnum.Pending ? "审核" : "查看详情" }}
+            </VDropdownItem>
+            <VDropdownDivider />
+            <VDropdownItem type="danger" @click="handleDelete(linkSubmit)">删除</VDropdownItem>
           </template>
         </VEntity>
       </VEntityContainer>

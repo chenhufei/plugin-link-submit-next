@@ -5,7 +5,7 @@ metadata:
 spec:
   forms:
     - group: basic
-      label: 基本设置
+      label: 提交审核
       formSchema:
         - $formkit: switch
           name: loadPlugInResources
@@ -42,7 +42,7 @@ spec:
           help: 提交时自动抓取网站标题、描述、favicon
           value: true
     - group: notification
-      label: 通知设置
+      label: 消息通知
       formSchema:
         - $formkit: radio
           name: sendEmail
@@ -85,7 +85,7 @@ spec:
           label: Webhook 签名密钥
           help: 可选，用于验证 Webhook 请求
     - group: link
-      label: 友链设置
+      label: 友链分组
       formSchema:
         - $formkit: select
           id: groupName

@@ -53,6 +53,12 @@ spec:
     - name: type
       type: string
       description: "类型"
+    - name: displayName
+      type: string
+      description: "博客名称"
+    - name: url
+      type: string
+      description: "博客链接"
 
 ---
 
@@ -70,6 +76,12 @@ spec:
     - name: type
       type: string
       description: "类型"
+    - name: displayName
+      type: string
+      description: "博客名称"
+    - name: url
+      type: string
+      description: "博客链接"
     - name: reviewDescription
       type: string
       optional: true
