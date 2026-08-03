@@ -10,12 +10,19 @@ metadata:
     rbac.authorization.halo.run/module: "PluginLinkSubmitAnonymous"
     rbac.authorization.halo.run/display-name: "PluginLinkSubmit Anonymous AccessRole"
 rules:
-  - apiGroups: [ "api.link.submit.kunkunyu.com" ]
+  - apiGroups: [ "api.link.submit.halo.run" ]
     resources: [ "linkgroups", "site-info" ]
     verbs: [ "get", "list" ]
-  - apiGroups: [ "api.link.submit.kunkunyu.com" ]
-    resources: [ "linksubmits" ]
+  - apiGroups: [ "api.link.submit.halo.run" ]
+    resources: [ "linksubmits", "linksubmits/submit" ]
     verbs: [ "create" ]
+  - nonResourceURLs:
+      - "/apis/api.link.submit.halo.run/v1alpha1/linkgroups"
+      - "/apis/api.link.submit.halo.run/v1alpha1/site-info"
+    verbs: [ "get" ]
+  - nonResourceURLs:
+      - "/apis/api.link.submit.halo.run/v1alpha1/linksubmits/-/submit"
+    verbs: [ "post" ]
 
 
 ---
@@ -32,10 +39,10 @@ metadata:
     rbac.authorization.halo.run/ui-permissions: |
       ["plugin:link:submit-next:view"]
 rules:
-  - apiGroups: [ "link.submit.kunkunyu.com" ]
+  - apiGroups: [ "link.submit.halo.run" ]
     resources: [ "linksubmits","cronlinksubmits" ]
     verbs: [ "get", "list" ]
-  - apiGroups: [ "console.api.link.submit.kunkunyu.com" ]
+  - apiGroups: [ "console.api.link.submit.halo.run" ]
     resources: [ "linksubmits"]
     verbs: [ "get", "list" ]
 
@@ -55,9 +62,9 @@ metadata:
     rbac.authorization.halo.run/dependencies: |
       ["role-template-link-submit-next-view"]
 rules:
-  - apiGroups: [ "link.submit.kunkunyu.com" ]
+  - apiGroups: [ "link.submit.halo.run" ]
     resources: [ "linksubmits","cronlinksubmits" ]
     verbs: [ "create", "patch", "update", "delete", "deletecollection" ]
-  - apiGroups: [ "console.api.link.submit.kunkunyu.com" ]
+  - apiGroups: [ "console.api.link.submit.halo.run" ]
     resources: [ "linksubmits/check" ]
     verbs: [ "create", "patch", "update", "delete", "deletecollection" ]

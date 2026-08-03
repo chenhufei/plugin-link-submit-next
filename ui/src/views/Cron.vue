@@ -3,7 +3,7 @@ import { linkSubmitCoreApiClient } from "@/api";
 import type { CronLinkSubmit } from "@/api/generated";
 import type { LinkGroupList } from "@/domain";
 import { axiosInstance } from "@halo-dev/api-client";
-import { Toast, VAlert, VDescription, VDescriptionItem } from "@halo-dev/components";
+import { Toast, VAlert, VDescription, VDescriptionItem, VLoading } from "@halo-dev/components";
 import { utils } from "@halo-dev/ui-shared";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { computed, ref } from "vue";
@@ -15,7 +15,7 @@ function createDefaultTask(): CronLinkSubmit {
     metadata: { name: TASK_NAME },
     spec: {
       cron: "@daily",
-      suspend: false,
+      suspend: true,
       cleanConfig: {
         type: "delete",
         withoutCheckGroupNames: [],
@@ -23,20 +23,20 @@ function createDefaultTask(): CronLinkSubmit {
       },
     },
     kind: "CronLinkSubmit",
-    apiVersion: "link.submit.kunkunyu.com/v1alpha1",
+    apiVersion: "link.submit.halo.run/v1alpha1",
   };
 }
 
 const formState = ref<CronLinkSubmit>(createDefaultTask());
 const taskExists = computed(() => Boolean(formState.value.metadata.creationTimestamp));
 const enabled = computed({
-  get: () => Boolean(formState.value.spec.suspend),
+  get: () => !Boolean(formState.value.spec.suspend),
   set: (value: boolean) => {
-    formState.value.spec.suspend = value;
+    formState.value.spec.suspend = !value;
   },
 });
 
-const { isLoading, isFetching } = useQuery({
+const { isLoading } = useQuery({
   queryKey: ["cron-link-submit"],
   queryFn: async () => {
     const { data } = await linkSubmitCoreApiClient.cronLinkSubmit.listCronLinkSubmit(
@@ -113,11 +113,15 @@ function formatTime(value?: string) {
       :closable="false"
     />
 
+    <div v-if="isLoading" class=":uno: py-12">
+      <VLoading />
+    </div>
+
     <FormKit
+      v-else
       id="cron-setting"
       type="form"
       :actions="false"
-      :disabled="isFetching"
       @submit="save"
     >
       <FormKit v-model="enabled" label="启用定时任务" type="switch" name="enabled" />

@@ -3,7 +3,7 @@ plugins {
     id "com.github.node-gradle.node" version "7.1.0"
 }
 
-group 'com.kunkunyu.link.submit.ui'
+group 'run.halo.linksubmit.ui'
 
 tasks.register('buildFrontend', PnpmTask) {
     group = 'build'

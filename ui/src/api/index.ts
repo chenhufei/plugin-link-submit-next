@@ -1,6 +1,6 @@
 import { axiosInstance } from "@halo-dev/api-client";
 import {
-  ConsoleApiLinkSubmitKunkunyuComV1alpha1ListLinkSubmitApi,
+  ConsoleApiLinkSubmitHaloRunV1alpha1ListLinkSubmitApi,
   LinkSubmitV1alpha1Api,
   CronLinkSubmitV1alpha1Api
 
@@ -13,6 +13,6 @@ const linkSubmitCoreApiClient = {
 };
 
 const linkSubmitApiClient = {
-  linkSubmit: new ConsoleApiLinkSubmitKunkunyuComV1alpha1ListLinkSubmitApi(undefined,"",axiosInstance),
+  linkSubmit: new ConsoleApiLinkSubmitHaloRunV1alpha1ListLinkSubmitApi(undefined,"",axiosInstance),
 };
 export { linkSubmitCoreApiClient, linkSubmitApiClient };

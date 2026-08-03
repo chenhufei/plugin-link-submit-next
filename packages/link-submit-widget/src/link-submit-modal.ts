@@ -97,7 +97,7 @@ export class LinkSubmitModal extends LitElement {
 
   private async fetchGroups() {
     try {
-      const response = await fetch('/apis/api.link.submit.kunkunyu.com/v1alpha1/linkgroups', {
+      const response = await fetch('/apis/api.link.submit.halo.run/v1alpha1/linkgroups', {
         credentials: 'same-origin',
         headers: { Accept: 'application/json' },
       });
@@ -142,7 +142,7 @@ export class LinkSubmitModal extends LitElement {
     this.fetchingSite = true;
     try {
       // 调用后端代理端点（服务端抓取，无 CORS 问题）
-      const apiUrl = `/apis/api.link.submit.kunkunyu.com/v1alpha1/site-info?url=${encodeURIComponent(url)}`;
+      const apiUrl = `/apis/api.link.submit.halo.run/v1alpha1/site-info?url=${encodeURIComponent(url)}`;
       const response = await fetch(apiUrl);
       if (!response.ok) {
         this.showToast('获取网站信息失败，请手动填写', 'error');
@@ -203,7 +203,7 @@ export class LinkSubmitModal extends LitElement {
     };
 
     try {
-      const response = await fetch('/apis/api.link.submit.kunkunyu.com/v1alpha1/linksubmits/-/submit', {
+      const response = await fetch('/apis/api.link.submit.halo.run/v1alpha1/linksubmits/-/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
