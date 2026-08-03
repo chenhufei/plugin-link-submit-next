@@ -12,6 +12,8 @@ public interface LinkService {
 
     Flux<LinkGroupVo> listGroup();
 
+    Flux<Link> listLink();
+
     Mono<Boolean> isExists(String url);
 
     Mono<Link> create(LinkSubmit linkSubmit);

@@ -1,7 +1,6 @@
 package run.halo.linksubmit.service.impl;
 
 import run.halo.linksubmit.extension.Link;
-import run.halo.linksubmit.extension.LinkGroup;
 import run.halo.linksubmit.extension.LinkSubmit;
 import run.halo.linksubmit.service.LinkService;
 import run.halo.linksubmit.service.SettingConfigLinkSubmit;
@@ -15,38 +14,39 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import run.halo.app.extension.ListOptions;
 import run.halo.app.extension.Metadata;
-import run.halo.app.extension.ReactiveExtensionClient;
 import run.halo.app.extension.router.selector.FieldSelector;
 
 import java.util.HashMap;
 
 import static org.springframework.data.domain.Sort.Order.asc;
+import static run.halo.app.extension.ExtensionUtil.notDeleting;
 
 @Component
 @RequiredArgsConstructor
 public class LinkServiceImpl implements LinkService {
 
-    private final ReactiveExtensionClient client;
+    private final OfficialLinksClient officialLinksClient;
 
     private final SettingConfigLinkSubmit settingConfigLinkSubmit;
 
     @Override
     public Mono<Link> getName(String name) {
-        return client.fetch(Link.class, name);
+        return officialLinksClient.fetchLink(name);
     }
 
     @Override
     public Flux<LinkGroupVo> listGroup() {
         var listOptions = new ListOptions();
         listOptions.setFieldSelector(FieldSelector.all());
-        return client.listAll(LinkGroup.class, listOptions, defaultLinkSort())
+        return officialLinksClient.listGroups(listOptions, defaultLinkSort())
             .map(LinkGroupVo::from);
     }
 
+    @Override
     public Flux<Link> listLink() {
         var listOptions = new ListOptions();
-        listOptions.setFieldSelector(FieldSelector.all());
-        return client.listAll(Link.class, listOptions, Sort.unsorted());
+        listOptions.setFieldSelector(FieldSelector.of(notDeleting()));
+        return officialLinksClient.listLinks(listOptions, Sort.unsorted());
     }
 
     @Override
@@ -89,18 +89,18 @@ public class LinkServiceImpl implements LinkService {
             link.setMetadata(metadata);
             link.setSpec(spec);
 
-            return client.create(link);
+            return officialLinksClient.createLink(link);
         });
     }
 
     @Override
     public Mono<Link> delete(Link link) {
-        return client.delete(link);
+        return officialLinksClient.deleteLink(link);
     }
 
     @Override
     public Mono<Link> update(Link link) {
-        return client.update(link);
+        return officialLinksClient.updateLink(link);
     }
 
     static Sort defaultLinkSort() {

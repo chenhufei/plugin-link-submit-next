@@ -89,7 +89,20 @@ const handleSelectGroupRemote = {
       size: data.size,
     };
   },
-  findOptionsByValues: () => [],
+  findOptionsByValues: async (values: string[]) => {
+    if (!values.length) return [];
+    const { data } = await axiosInstance.get<LinkGroupList>(
+      "/apis/core.halo.run/v1alpha1/linkgroups",
+      { params: { page: 1, size: 1000 } }
+    );
+    const selectedValues = new Set(values);
+    return data.items
+      .filter((item) => selectedValues.has(item.metadata.name))
+      .map((item) => ({
+        label: item.spec?.displayName,
+        value: item.metadata.name,
+      }));
+  },
 };
 
 const cronOptions = [

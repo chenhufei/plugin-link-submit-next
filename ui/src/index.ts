@@ -1,7 +1,10 @@
 import { definePlugin } from "@halo-dev/ui-shared";
 import { markRaw } from "vue";
+import { installLinksManagementEntry } from "@/integrations/links-management-entry";
 import LinkVariantPlus from "~icons/mdi/link-variant-plus";
 import "uno.css";
+
+installLinksManagementEntry();
 
 export default definePlugin({
   components: {},

@@ -41,9 +41,6 @@ public class SettingConfigLinkSubmitImpl implements SettingConfigLinkSubmit {
                 // notification group
                 config.setSendEmail(notification.isSendEmail());
                 config.setAdminEmail(notification.getAdminEmail());
-                config.setEnableWebhook(notification.isEnableWebhook());
-                config.setWebhookUrl(notification.getWebhookUrl());
-                config.setWebhookSecret(notification.getWebhookSecret());
                 // link group
                 config.setGroupName(link.getGroupName());
                 config.setForbidSelectedGroupName(link.getForbidSelectedGroupName());

@@ -20,6 +20,7 @@ import org.jsoup.nodes.Element;
 import org.springdoc.core.fn.builders.schema.Builder;
 import org.springdoc.webflux.core.fn.SpringdocRouteBuilder;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -74,6 +75,12 @@ public class AnonymousEndpoint implements CustomEndpoint {
     @Override
     public RouterFunction<ServerResponse> endpoint() {
         return SpringdocRouteBuilder.route()
+            .GET("configuration", this::configuration, builder -> {
+                builder.operationId("linkSubmitConfiguration")
+                    .description("友链自助提交公开功能配置")
+                    .tag(TAG)
+                    .response(responseBuilder().implementation(Map.class));
+            })
             .GET("linkgroups", this::linkGroups, builder -> {
                 builder.operationId("linkGroups")
                     .description("友链分组")
@@ -108,6 +115,12 @@ public class AnonymousEndpoint implements CustomEndpoint {
                     .response(responseBuilder()
                         .implementation(LinkSubmit.class))
             ).build();
+    }
+
+    Mono<ServerResponse> configuration(ServerRequest request) {
+        return settingConfigLinkSubmit.getBasicConfig()
+            .flatMap(config -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("linkPreviewEnabled", config.isEnableLinkPreview())));
     }
 
     Mono<ServerResponse> linkGroups(ServerRequest request) {
@@ -162,7 +175,14 @@ public class AnonymousEndpoint implements CustomEndpoint {
         }
 
         final String finalUrl = url;
-        return Mono.fromCallable(() -> {
+        return settingConfigLinkSubmit.getBasicConfig().flatMap(config -> {
+            if (!config.isEnableLinkPreview()) {
+                return ServerResponse.status(HttpStatus.FORBIDDEN).bodyValue(Map.of(
+                    "title", "链接预览未启用",
+                    "status", 403,
+                    "detail", "管理员已关闭链接预览功能"));
+            }
+            return Mono.fromCallable(() -> {
             SafeUrlValidator.requirePublicHttpUrl(finalUrl);
             Document doc = fetchDocument(finalUrl)
                 .doc();
@@ -219,20 +239,21 @@ public class AnonymousEndpoint implements CustomEndpoint {
             result.put("description", description == null ? "" : description);
             result.put("logo", logo == null ? "" : logo);
             return result;
-        })
-        .subscribeOn(Schedulers.boundedElastic())
-        .flatMap(result -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(result))
-        .onErrorResume(IllegalArgumentException.class, e ->
-            ServerResponse.badRequest().bodyValue(Map.of(
-                "title", "URL 不可访问",
-                "status", 400,
-                "detail", e.getMessage())))
-        .onErrorResume(e -> {
-            log.warn("Failed to fetch site info for {}: {}", finalUrl, e.getMessage());
-            return ServerResponse.status(502).bodyValue(Map.of(
-                "title", "网站信息获取失败",
-                "status", 502,
-                "detail", "目标网站暂时无法访问"));
+            })
+            .subscribeOn(Schedulers.boundedElastic())
+            .flatMap(result -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(result))
+            .onErrorResume(IllegalArgumentException.class, e ->
+                ServerResponse.badRequest().bodyValue(Map.of(
+                    "title", "URL 不可访问",
+                    "status", 400,
+                    "detail", e.getMessage())))
+            .onErrorResume(e -> {
+                log.warn("Failed to fetch site info for {}: {}", finalUrl, e.getMessage());
+                return ServerResponse.status(502).bodyValue(Map.of(
+                    "title", "网站信息获取失败",
+                    "status", 502,
+                    "detail", "目标网站暂时无法访问"));
+            });
         });
     }
 

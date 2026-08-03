@@ -44,17 +44,12 @@ spec:
     - group: notification
       label: 消息通知
       formSchema:
-        - $formkit: radio
+        - $formkit: switch
           name: sendEmail
           id: sendEmail
           key: sendEmail
-          label: 是否发送邮件通知
+          label: 发送邮件通知
           value: false
-          options:
-            - value: true
-              label: 开启
-            - value: false
-              label: 关闭
         - $formkit: text
           if: $get(sendEmail).value === true
           id: adminEmail
@@ -64,26 +59,6 @@ spec:
           label: 管理员邮箱
           help: 管理员邮箱，用于接收邮件通知
           validation: required|email
-        - $formkit: switch
-          name: enableWebhook
-          label: 启用 Webhook 通知
-          help: 通过 Webhook 推送通知到企业微信/钉钉/飞书等
-          value: false
-        - $formkit: text
-          if: $get(enableWebhook).value === true
-          name: webhookUrl
-          id: webhookUrl
-          key: webhookUrl
-          label: Webhook URL
-          help: 填写企业微信/钉钉/飞书机器人的 Webhook 地址
-          validation: required|url
-        - $formkit: text
-          if: $get(enableWebhook).value === true
-          name: webhookSecret
-          id: webhookSecret
-          key: webhookSecret
-          label: Webhook 签名密钥
-          help: 可选，用于验证 Webhook 请求
     - group: link
       label: 友链分组
       formSchema:
