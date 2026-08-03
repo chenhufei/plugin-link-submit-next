@@ -11,13 +11,14 @@ metadata:
     rbac.authorization.halo.run/display-name: "PluginLinkSubmit Anonymous AccessRole"
 rules:
   - apiGroups: [ "api.link.submit.halo.run" ]
-    resources: [ "linkgroups", "site-info" ]
+    resources: [ "configuration", "linkgroups", "site-info" ]
     verbs: [ "get", "list" ]
   - apiGroups: [ "api.link.submit.halo.run" ]
     resources: [ "linksubmits", "linksubmits/submit" ]
     verbs: [ "create" ]
   - nonResourceURLs:
       - "/apis/api.link.submit.halo.run/v1alpha1/linkgroups"
+      - "/apis/api.link.submit.halo.run/v1alpha1/configuration"
       - "/apis/api.link.submit.halo.run/v1alpha1/site-info"
     verbs: [ "get" ]
   - nonResourceURLs:

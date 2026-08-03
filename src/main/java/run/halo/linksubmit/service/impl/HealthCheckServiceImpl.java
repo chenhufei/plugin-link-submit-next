@@ -1,18 +1,15 @@
 package run.halo.linksubmit.service.impl;
 
-import run.halo.linksubmit.extension.Link;
 import run.halo.linksubmit.extension.LinkSubmit;
 import run.halo.linksubmit.service.HealthCheckService;
 import run.halo.linksubmit.utils.LinkUtil;
 import run.halo.linksubmit.utils.SafeUrlValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
-import run.halo.app.extension.ListOptions;
-import run.halo.app.extension.ReactiveExtensionClient;
+import run.halo.linksubmit.service.LinkService;
 
 import javax.net.ssl.HttpsURLConnection;
 import java.net.HttpURLConnection;
@@ -24,7 +21,7 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class HealthCheckServiceImpl implements HealthCheckService {
 
-    private final ReactiveExtensionClient client;
+    private final LinkService linkService;
 
     @Override
     public Mono<LinkSubmit.HealthStatus> checkLinkHealth(String url) {
@@ -128,7 +125,7 @@ public class HealthCheckServiceImpl implements HealthCheckService {
 
     @Override
     public Mono<Void> batchHealthCheck() {
-        return client.listAll(Link.class, new ListOptions(), Sort.unsorted())
+        return linkService.listLink()
             .flatMap(link -> {
                 String url = link.getSpec().getUrl();
                 return checkLinkHealth(url)

@@ -56,9 +56,13 @@ export class LinkSubmitModal extends LitElement {
   @state()
   private fetchingSite = false;
 
+  @state()
+  private sitePreviewEnabled = true;
+
   constructor() {
     super();
     this.fetchGroups();
+    this.fetchConfiguration();
 
     setTimeout(() => {
       const modalContent = this.shadowRoot?.querySelector(
@@ -114,6 +118,20 @@ export class LinkSubmitModal extends LitElement {
       console.error('Error fetching groups:', error);
     } finally {
       this.loading = false;
+    }
+  }
+
+  private async fetchConfiguration() {
+    try {
+      const response = await fetch('/apis/api.link.submit.halo.run/v1alpha1/configuration', {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) return;
+      const data = await response.json() as { linkPreviewEnabled?: boolean };
+      this.sitePreviewEnabled = data.linkPreviewEnabled !== false;
+    } catch (error) {
+      console.error('Error fetching link submit configuration:', error);
     }
   }
 
@@ -313,16 +331,20 @@ export class LinkSubmitModal extends LitElement {
                 <label for="input-url" class="form-label">网址</label>
                 <div class="flex gap-2">
                   <input type="url" name="url" id="input-url" placeholder="https://" required class="form-input" style="flex:1;">
-                  <button
-                    type="button"
-                    class="form-button whitespace-nowrap"
-                    ?disabled=${this.fetchingSite}
-                    @click=${this.fetchSiteInfo}
-                  >
-                    ${this.fetchingSite ? '获取中...' : '获取信息'}
-                  </button>
+                  ${this.sitePreviewEnabled ? html`
+                    <button
+                      type="button"
+                      class="form-button whitespace-nowrap"
+                      ?disabled=${this.fetchingSite}
+                      @click=${this.fetchSiteInfo}
+                    >
+                      ${this.fetchingSite ? '获取中...' : '获取信息'}
+                    </button>
+                  ` : ''}
                 </div>
-                <div class="text-sm text-form-placeholder">填写网址后点击「获取信息」，自动填充标题、Logo 和描述</div>
+                ${this.sitePreviewEnabled ? html`
+                  <div class="text-sm text-form-placeholder">填写网址后点击「获取信息」，自动填充标题、Logo 和描述</div>
+                ` : ''}
               </div>
               <div class="flex flex-col gap-2">
                 <label for="input-name" class="form-label">网站标题</label>

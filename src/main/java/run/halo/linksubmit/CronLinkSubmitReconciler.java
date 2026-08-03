@@ -25,17 +25,13 @@ import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
 import run.halo.app.extension.ExtensionClient;
 import run.halo.app.extension.ExtensionUtil;
-import run.halo.app.extension.ListOptions;
 import run.halo.app.extension.controller.Controller;
 import run.halo.app.extension.controller.ControllerBuilder;
 import run.halo.app.extension.controller.Reconciler;
-import run.halo.app.extension.router.selector.FieldSelector;
 
 import static run.halo.linksubmit.Constant.DELETE;
 import static run.halo.linksubmit.Constant.MOVE;
 import static run.halo.linksubmit.Constant.ORIGINAL_GROUP_NAME;
-import static run.halo.app.extension.ExtensionUtil.defaultSort;
-import static run.halo.app.extension.ExtensionUtil.notDeleting;
 
 @Slf4j
 @Component
@@ -162,10 +158,7 @@ public class CronLinkSubmitReconciler implements Reconciler<Reconciler.Request> 
         Optional<SettingConfigLinkSubmit.BasicConfig> basicConfig =
             settingConfigLinkSubmit.getBasicConfig().blockOptional();
 
-        var listOptions = new ListOptions();
-        listOptions.setFieldSelector(FieldSelector.of(notDeleting()));
-
-        client.listAll(Link.class, listOptions, defaultSort())
+        linkService.listLink().toIterable()
             .forEach(link -> processLink(link, cleanConfig, basicConfig));
     }
 
@@ -178,12 +171,12 @@ public class CronLinkSubmitReconciler implements Reconciler<Reconciler.Request> 
         var type = cleanConfig.getType();
 
         boolean isExempt = withoutCheckGroupNames.contains(linkGroupName);
-        boolean isAlreadyMoved = CharSequenceUtil.equals(moveGroupName, linkGroupName);
-        boolean isReachable = LinkUtil.urlChecker(link.getSpec().getUrl());
-
         if (isExempt) {
             return;
         }
+
+        boolean isAlreadyMoved = CharSequenceUtil.equals(moveGroupName, linkGroupName);
+        boolean isReachable = LinkUtil.urlChecker(link.getSpec().getUrl());
 
         if (!isAlreadyMoved && !isReachable) {
             handleUnreachableLink(link, type, moveGroupName);

@@ -271,7 +271,7 @@ const handleOpenCheckModal = (linkSubmit?: LinkSubmit) => {
               :items="sortOptions"
             />
             <div class=":uno: flex flex-row items-end gap-2">
-              <VButton v-tooltip="'刷新'" size="sm" ghost @click="refetch()">
+              <VButton v-tooltip="'刷新'" aria-label="刷新友链申请" size="sm" ghost @click="refetch()">
                 <template #icon>
                 <IconRefreshLine
                   :class="{ 'animate-spin': isFetching }"

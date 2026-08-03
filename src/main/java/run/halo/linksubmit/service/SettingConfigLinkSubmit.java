@@ -22,9 +22,6 @@ public interface SettingConfigLinkSubmit {
         // notification group
         private boolean sendEmail;
         private String adminEmail;
-        private boolean enableWebhook;
-        private String webhookUrl;
-        private String webhookSecret;
 
         // link group
         private String groupName;
@@ -47,9 +44,6 @@ public interface SettingConfigLinkSubmit {
         public static final String GROUP = "notification";
         private boolean sendEmail;
         private String adminEmail = "";
-        private boolean enableWebhook;
-        private String webhookUrl = "";
-        private String webhookSecret = "";
     }
 
     @Data

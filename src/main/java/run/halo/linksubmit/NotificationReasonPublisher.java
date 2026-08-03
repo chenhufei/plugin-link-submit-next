@@ -127,6 +127,12 @@ public class NotificationReasonPublisher {
                         .url(spec.getUrl())
                         .description(spec.getDescription())
                         .logo(spec.getLogo())
+                        .oldUrl(spec.getOldUrl())
+                        .groupName(spec.getGroupName())
+                        .rssUrl(spec.getRssUrl())
+                        .message(spec.getMessage())
+                        .submittedAt(linkSubmit.getSubmitterProfile() == null
+                            ? "" : linkSubmit.getSubmitterProfile().getSubmittedAt())
                         .type(spec.getType().name())
                         .review(spec.getStatus().equals(LinkSubmit.ReviewStatus.review))
                         .reviewUrl(url)
@@ -140,7 +146,8 @@ public class NotificationReasonPublisher {
 
         @Builder
         record ReasonData(String adminEmail, String email, String displayName, String url, String description,
-                          String logo, String type, Boolean review, String reviewUrl) {
+                          String logo, String oldUrl, String groupName, String rssUrl, String message,
+                          String submittedAt, String type, Boolean review, String reviewUrl) {
         }
     }
 
@@ -170,6 +177,8 @@ public class NotificationReasonPublisher {
                         .type(spec.getType().name())
                         .displayName(spec.getDisplayName())
                         .url(spec.getUrl())
+                        .groupName(spec.getGroupName())
+                        .description(spec.getDescription())
                         .build();
                     builder.attributes(ReasonDataConverter.toAttributeMap(attributes))
                         .author(UserIdentity.anonymousWithEmail(email))
@@ -179,7 +188,8 @@ public class NotificationReasonPublisher {
 
 
         @Builder
-        record ReasonData(String email, String type, String displayName, String url) {
+        record ReasonData(String email, String type, String displayName, String url,
+                          String groupName, String description) {
         }
     }
 
@@ -210,6 +220,9 @@ public class NotificationReasonPublisher {
                         .type(spec.getType().name())
                         .displayName(spec.getDisplayName())
                         .url(spec.getUrl())
+                        .oldUrl(spec.getOldUrl())
+                        .groupName(spec.getGroupName())
+                        .description(spec.getDescription())
                         .reviewDescription(reviewDescription)
                         .through(spec.getStatus().equals(LinkSubmit.ReviewStatus.review))
                         .build();
@@ -221,8 +234,9 @@ public class NotificationReasonPublisher {
 
 
         @Builder
-        record ReasonData(String email, String type, String displayName, String url,
-                          String reviewDescription, Boolean through) {
+        record ReasonData(String email, String type, String displayName, String url, String oldUrl,
+                          String groupName, String description, String reviewDescription,
+                          Boolean through) {
         }
     }
 
