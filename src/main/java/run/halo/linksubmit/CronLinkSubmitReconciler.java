@@ -64,13 +64,17 @@ public class CronLinkSubmitReconciler implements Reconciler<Reconciler.Request> 
                 }
 
                 var spec = cronLinkSubmit.getSpec();
-                if (spec == null || !spec.isSuspend()) {
+                if (!isEnabled(spec)) {
                     return Result.doNotRetry();
                 }
 
                 return processCronSchedule(cronLinkSubmit, spec);
             })
             .orElseGet(Result::doNotRetry);
+    }
+
+    static boolean isEnabled(CronLinkSubmit.CronLinkSubmitSpec spec) {
+        return spec != null && !spec.isSuspend();
     }
 
     private Result processCronSchedule(CronLinkSubmit cronLinkSubmit,
