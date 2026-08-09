@@ -1,7 +1,7 @@
 import resetStyles from '@unocss/reset/tailwind.css?inline';
 import { styleMap } from 'lit/directives/style-map.js';
 import { LitElement, PropertyValues, css, html, unsafeCSS } from 'lit';
-import {property, state} from 'lit/decorators.js';
+import { property, state } from 'lit/decorators.js';
 import { OverlayScrollbars } from 'overlayscrollbars';
 import overlayscrollbarsStyles from 'overlayscrollbars/styles/overlayscrollbars.css?inline';
 import baseStyles from './styles/base';
@@ -59,15 +59,19 @@ export class LinkSubmitModal extends LitElement {
   @state()
   private sitePreviewEnabled = true;
 
+  private lastFetchedSiteInfo = {
+    title: '',
+    logo: '',
+    description: '',
+  };
+
   constructor() {
     super();
     this.fetchGroups();
     this.fetchConfiguration();
 
     setTimeout(() => {
-      const modalContent = this.shadowRoot?.querySelector(
-        '.modal__content'
-      ) as HTMLElement;
+      const modalContent = this.shadowRoot?.querySelector('.modal__content') as HTMLElement;
       if (modalContent) {
         OverlayScrollbars(modalContent, {
           scrollbars: {
@@ -113,7 +117,7 @@ export class LinkSubmitModal extends LitElement {
         throw new Error('友链分组接口返回格式错误');
       }
       if (!response.ok) throw new Error((data as ErrorResponse)?.detail || '友链分组加载失败');
-      this.groups = Array.isArray(data) ? data as LinkGroup[] : [];
+      this.groups = Array.isArray(data) ? (data as LinkGroup[]) : [];
     } catch (error) {
       console.error('Error fetching groups:', error);
     } finally {
@@ -128,7 +132,7 @@ export class LinkSubmitModal extends LitElement {
         headers: { Accept: 'application/json' },
       });
       if (!response.ok) return;
-      const data = await response.json() as { linkPreviewEnabled?: boolean };
+      const data = (await response.json()) as { linkPreviewEnabled?: boolean };
       this.sitePreviewEnabled = data.linkPreviewEnabled !== false;
     } catch (error) {
       console.error('Error fetching link submit configuration:', error);
@@ -166,9 +170,13 @@ export class LinkSubmitModal extends LitElement {
         this.showToast('获取网站信息失败，请手动填写', 'error');
         return;
       }
-      const data = await response.json() as { title?: string; description?: string; logo?: string };
+      const data = (await response.json()) as {
+        title?: string;
+        description?: string;
+        logo?: string;
+      };
+      this.fillSiteInfo(data.title, data.logo, data.description);
       if (data.title || data.description || data.logo) {
-        this.fillSiteInfo(data.title, data.logo, data.description);
         this.showToast('已自动填充网站信息');
       } else {
         this.showToast('未能获取到网站信息，请手动填写', 'error');
@@ -183,16 +191,35 @@ export class LinkSubmitModal extends LitElement {
   private fillSiteInfo(title?: string, logo?: string, description?: string) {
     const nameInput = this.shadowRoot?.querySelector('#input-name') as HTMLInputElement;
     const logoInput = this.shadowRoot?.querySelector('#input-logo') as HTMLInputElement;
-    const descTextarea = this.shadowRoot?.querySelector('#textarea-description') as HTMLTextAreaElement;
+    const descTextarea = this.shadowRoot?.querySelector(
+      '#textarea-description'
+    ) as HTMLTextAreaElement;
 
-    if (title && nameInput && !nameInput.value.trim()) {
-      nameInput.value = title;
+    if (nameInput) {
+      this.replaceFetchedValue(nameInput, title, this.lastFetchedSiteInfo.title);
     }
-    if (logo && logoInput && !logoInput.value.trim()) {
-      logoInput.value = logo;
+    if (logoInput) {
+      this.replaceFetchedValue(logoInput, logo, this.lastFetchedSiteInfo.logo);
     }
-    if (description && descTextarea && !descTextarea.value.trim()) {
-      descTextarea.value = description;
+    if (descTextarea) {
+      this.replaceFetchedValue(descTextarea, description, this.lastFetchedSiteInfo.description);
+    }
+
+    this.lastFetchedSiteInfo = {
+      title: title?.trim() || '',
+      logo: logo?.trim() || '',
+      description: description?.trim() || '',
+    };
+  }
+
+  private replaceFetchedValue(
+    field: HTMLInputElement | HTMLTextAreaElement,
+    nextValue: string | undefined,
+    previousFetchedValue: string
+  ) {
+    const currentValue = field.value.trim();
+    if (!currentValue || currentValue === previousFetchedValue) {
+      field.value = nextValue?.trim() || '';
     }
   }
 
@@ -251,7 +278,7 @@ export class LinkSubmitModal extends LitElement {
       } else {
         this.showToast('提交成功，请等待审核');
       }
-      
+
       // 延迟关闭表单，让用户看到提示
       setTimeout(() => {
         this.handleClose();
@@ -267,39 +294,41 @@ export class LinkSubmitModal extends LitElement {
     return html`
       <div class="p-6 z-1 bg-base sticky top-0 border-form-border">
         <div class="flex flex-row-reverse items-center justify-between">
-          <button 
-            type="button" 
-            tabindex="0" 
+          <button
+            type="button"
+            tabindex="0"
             aria-label="关闭"
             class="text-xl text-form-label hover:text-form-text transition-colors"
             @click=${this.handleClose}
           >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              class="w-6 h-6" 
-              fill="none" 
-              viewBox="0 0 24 24" 
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="w-6 h-6"
+              fill="none"
+              viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path 
-                stroke-linecap="round" 
-                stroke-linejoin="round" 
-                stroke-width="2" 
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
                 d="M6 18L18 6M6 6l12 12"
               />
             </svg>
           </button>
-          <h2 id="link-submit-modal-title" class="text-xl font-semibold text-form-text">提交网站</h2>
+          <h2 id="link-submit-modal-title" class="text-xl font-semibold text-form-text">
+            提交网站
+          </h2>
         </div>
         <div class="mt-6">
           <form class="flex flex-col gap-6" @submit=${this.handleSubmit}>
             <div class="grid grid-cols-2 gap-4">
               <div class="flex flex-col gap-2">
                 <label for="input-type" class="form-label">类型</label>
-                <select 
-                  id="input-type" 
-                  name="type" 
-                  required 
+                <select
+                  id="input-type"
+                  name="type"
+                  required
                   class="form-input"
                   @change=${this.handleTypeChange}
                 >
@@ -309,76 +338,118 @@ export class LinkSubmitModal extends LitElement {
               </div>
               <div class="flex flex-col gap-2">
                 <label for="input-group-name" class="form-label">网站分组</label>
-                <select 
-                  id="input-group-name" 
-                  name="groupName" 
-                  required 
+                <select
+                  id="input-group-name"
+                  name="groupName"
+                  required
                   class="form-input"
                   ?disabled=${this.loading}
                 >
-                  ${this.groups.map(group => html`
-                    <option value="${group.groupName}">${group.displayName}</option>
-                  `)}
+                  ${this.groups.map(
+                    (group) => html`
+                      <option value="${group.groupName}">${group.displayName}</option>
+                    `
+                  )}
                 </select>
-                ${this.loading ? html`
-                  <div class="text-sm text-form-placeholder">加载中...</div>
-                ` : ''}
+                ${
+                  this.loading
+                    ? html` <div class="text-sm text-form-placeholder">加载中...</div> `
+                    : ''
+                }
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
               <div class="flex flex-col gap-2">
                 <label for="input-url" class="form-label">网址</label>
-                <div class="flex gap-2">
-                  <input type="url" name="url" id="input-url" placeholder="https://" required class="form-input" style="flex:1;">
-                  ${this.sitePreviewEnabled ? html`
-                    <button
-                      type="button"
-                      class="form-button whitespace-nowrap"
-                      ?disabled=${this.fetchingSite}
-                      @click=${this.fetchSiteInfo}
-                    >
-                      ${this.fetchingSite ? '获取中...' : '获取信息'}
-                    </button>
-                  ` : ''}
+                <div class="site-info-field">
+                  <input
+                    type="url"
+                    name="url"
+                    id="input-url"
+                    placeholder="https://"
+                    required
+                    class="form-input site-info-url-input"
+                  />
+                  ${
+                    this.sitePreviewEnabled
+                      ? html`
+                          <button
+                            type="button"
+                            class="form-button site-info-trigger"
+                            ?disabled=${this.fetchingSite}
+                            @click=${this.fetchSiteInfo}
+                          >
+                            ${this.fetchingSite ? '获取中...' : '获取信息'}
+                          </button>
+                        `
+                      : ''
+                  }
                 </div>
-                ${this.sitePreviewEnabled ? html`
-                  <div class="text-sm text-form-placeholder">填写网址后点击「获取信息」，自动填充标题、Logo 和描述</div>
-                ` : ''}
+                ${
+                  this.sitePreviewEnabled
+                    ? html`
+                        <div class="text-sm text-form-placeholder">
+                          填写网址后点击「获取信息」，自动填充标题、Logo 和描述
+                        </div>
+                      `
+                    : ''
+                }
               </div>
               <div class="flex flex-col gap-2">
                 <label for="input-name" class="form-label">网站标题</label>
-                <input type="text" name="displayName" id="input-name" required class="form-input">
+                <input type="text" name="displayName" id="input-name" required class="form-input" />
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
               <div class="flex flex-col gap-2">
                 <label for="input-logo" class="form-label">logo</label>
-                <input type="url" name="logo" id="input-logo" class="form-input" placeholder="可选，留空将自动获取">
+                <input
+                  type="url"
+                  name="logo"
+                  id="input-logo"
+                  class="form-input"
+                  placeholder="可选，留空将自动获取"
+                />
               </div>
               <div class="flex flex-col gap-2">
                 <label for="input-url-rss" class="form-label">RSS地址</label>
-                <input type="url" name="rssUrl" id="input-url-rss" class="form-input">
+                <input type="url" name="rssUrl" id="input-url-rss" class="form-input" />
               </div>
             </div>
 
             <div class="flex flex-col gap-2">
               <label for="textarea-description" class="form-label">网站描述</label>
-              <textarea id="textarea-description" name="description" rows="2" class="form-input"></textarea>
+              <textarea
+                id="textarea-description"
+                name="description"
+                rows="2"
+                class="form-input"
+              ></textarea>
             </div>
 
             <div class="flex flex-col gap-2">
               <label for="textarea-message" class="form-label">备注留言</label>
-              <textarea id="textarea-message" name="message" rows="2" class="form-input" placeholder="可选，向站长说明你的友链意图"></textarea>
+              <textarea
+                id="textarea-message"
+                name="message"
+                rows="2"
+                class="form-input"
+                placeholder="可选，向站长说明你的友链意图"
+              ></textarea>
             </div>
 
-            ${this.selectedType === 'update' ? html`
+            ${
+              this.selectedType === 'update'
+                ? html`
               <div class="flex flex-col gap-2">
                 <label for="textarea-old-url" class="form-label">旧的网址</label>
                 <input type="url" name="oldUrl" id="textarea-old-url" required class="form-input"></input>
               </div>
-            ` : ''}
+            `
+                : ''
+            }
 
             <div>
               <label for="input-email" class="form-label">邮箱</label>
@@ -404,18 +475,28 @@ export class LinkSubmitModal extends LitElement {
         </div>
       </div>
 
-      ${this.toastMessage ? html`
-        <div class="fixed top-4 right-4 z-50 animate-fade-in">
-          <div class="rounded-lg shadow-lg px-6 py-4 ${this.toastType === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
-            <div class="${this.toastType === 'success' ? 'text-green-800' : 'text-red-800'} font-medium">
-              ${this.toastType === 'success' ? '成功' : '错误'}
-            </div>
-            <div class="${this.toastType === 'success' ? 'text-green-600' : 'text-red-600'} text-sm mt-1">
-              ${this.toastMessage}
-            </div>
-          </div>
-        </div>
-      ` : ''}
+      ${
+        this.toastMessage
+          ? html`
+              <div class="fixed top-4 right-4 z-50 animate-fade-in">
+                <div
+                  class="rounded-lg shadow-lg px-6 py-4 ${this.toastType === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}"
+                >
+                  <div
+                    class="${this.toastType === 'success' ? 'text-green-800' : 'text-red-800'} font-medium"
+                  >
+                    ${this.toastType === 'success' ? '成功' : '错误'}
+                  </div>
+                  <div
+                    class="${this.toastType === 'success' ? 'text-green-600' : 'text-red-600'} text-sm mt-1"
+                  >
+                    ${this.toastMessage}
+                  </div>
+                </div>
+              </div>
+            `
+          : ''
+      }
     `;
   }
 
@@ -428,10 +509,7 @@ export class LinkSubmitModal extends LitElement {
       style="${styleMap({ display: this.open ? 'flex' : 'none' })}"
     >
       <div class="modal__layer" @click="${this.handleClose}"></div>
-      <div
-        data-overlayscrollbars-initialize
-        class="modal__content shadow-xl bg-modal"
-      >
+      <div data-overlayscrollbars-initialize class="modal__content shadow-xl bg-modal">
         ${this.open ? this.linkSubmitForm() : ''}
       </div>
     </div>`;
@@ -514,12 +592,46 @@ export class LinkSubmitModal extends LitElement {
         }
       }
 
+      .site-info-field {
+        display: flex;
+        min-width: 0;
+        align-items: stretch;
+        gap: 0.5rem;
+      }
+
+      .site-info-url-input {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+
+      .site-info-trigger {
+        flex: 0 0 auto;
+        box-sizing: border-box;
+        min-height: 50px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 1rem;
+        white-space: nowrap;
+      }
+
+      @media (max-width: 560px) {
+        .site-info-field {
+          flex-direction: column;
+        }
+
+        .site-info-trigger {
+          width: 100%;
+        }
+      }
+
       @unocss-placeholder;
     `,
   ];
 }
 
-customElements.get('link-submit-modal') || customElements.define('link-submit-modal', LinkSubmitModal);
+customElements.get('link-submit-modal') ||
+  customElements.define('link-submit-modal', LinkSubmitModal);
 
 declare global {
   interface HTMLElementTagNameMap {
