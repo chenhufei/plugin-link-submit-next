@@ -111,8 +111,8 @@ public class LinkSubmitReconciler implements Reconciler<Reconciler.Request> {
             subscriber.setName(UserIdentity.anonymousWithEmail(email).name());
             notificationCenter.subscribe(subscriber, interestReason).block();
         } catch (Exception e) {
-            log.warn("Failed to subscribe notification for email={}, reasonType={}: {}",
-                email, reasonType, e.getMessage());
+            log.warn("Failed to subscribe notification for reasonType={}: {}",
+                reasonType, e.getMessage());
         }
     }
 
