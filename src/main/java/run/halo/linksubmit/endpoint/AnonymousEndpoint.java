@@ -8,7 +8,9 @@ import run.halo.linksubmit.utils.IpAddressUtils;
 import run.halo.linksubmit.vo.LinkGroupVo;
 import run.halo.linksubmit.utils.SafeUrlValidator;
 import io.github.resilience4j.ratelimiter.RateLimiter;
+import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import io.github.resilience4j.reactor.ratelimiter.operator.RateLimiterOperator;
 import jakarta.annotation.PreDestroy;
 import jakarta.validation.constraints.NotBlank;
@@ -30,6 +32,7 @@ import reactor.core.scheduler.Schedulers;
 import run.halo.app.core.extension.endpoint.CustomEndpoint;
 import run.halo.app.extension.GroupVersion;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +49,12 @@ import static org.springdoc.core.fn.builders.requestbody.Builder.requestBodyBuil
 public class AnonymousEndpoint implements CustomEndpoint {
 
     private static final String TAG = "api.link.submit.halo.run/v1alpha1/LinkSubmit";
+    static final int SITE_INFO_LIMIT_PER_MINUTE = 12;
+    static final RateLimiterConfig SITE_INFO_RATE_LIMITER_CONFIG = RateLimiterConfig.custom()
+        .limitForPeriod(SITE_INFO_LIMIT_PER_MINUTE)
+        .limitRefreshPeriod(Duration.ofMinutes(1))
+        .timeoutDuration(Duration.ZERO)
+        .build();
 
     private final SettingConfigLinkSubmit settingConfigLinkSubmit;
 
@@ -148,6 +157,8 @@ public class AnonymousEndpoint implements CustomEndpoint {
             .flatMap(req -> linkSubmitService.createLinkSubmit(req, clientIp))
             .transformDeferred(RateLimiterOperator.of(rateLimiter))
             .flatMap(resultsVo -> ServerResponse.ok().bodyValue(resultsVo))
+            .onErrorResume(RequestNotPermitted.class,
+                e -> tooManyRequests("提交过于频繁，请稍后再试"))
             .onErrorResume(e -> {
                 log.error("Link submit failed: {}", e.getMessage(), e);
                 org.springframework.web.server.ResponseStatusException ex;
@@ -166,6 +177,11 @@ public class AnonymousEndpoint implements CustomEndpoint {
      * 使用 jsoup 抓取目标页面 HTML 并解析 og 标签和标准 meta 标签。
      */
     Mono<ServerResponse> fetchSiteInfo(ServerRequest request) {
+        String clientIp = IpAddressUtils.getIpAddress(request);
+        String limiterName = "site-info-" + clientIp;
+        limiterNames.add(limiterName);
+        RateLimiter rateLimiter = rateLimiterRegistry.rateLimiter(
+            limiterName, SITE_INFO_RATE_LIMITER_CONFIG);
         String url = request.queryParam("url").orElse("").trim();
         if (url.isEmpty()) {
             return ServerResponse.badRequest().bodyValue(Map.of("error", "url 参数不能为空"));
@@ -241,7 +257,10 @@ public class AnonymousEndpoint implements CustomEndpoint {
             return result;
             })
             .subscribeOn(Schedulers.boundedElastic())
+            .transformDeferred(RateLimiterOperator.of(rateLimiter))
             .flatMap(result -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(result))
+            .onErrorResume(RequestNotPermitted.class,
+                e -> tooManyRequests("网站信息获取过于频繁，请稍后再试"))
             .onErrorResume(IllegalArgumentException.class, e ->
                 ServerResponse.badRequest().bodyValue(Map.of(
                     "title", "URL 不可访问",
@@ -255,6 +274,16 @@ public class AnonymousEndpoint implements CustomEndpoint {
                     "detail", "目标网站暂时无法访问"));
             });
         });
+    }
+
+    private static Mono<ServerResponse> tooManyRequests(String detail) {
+        return ServerResponse.status(HttpStatus.TOO_MANY_REQUESTS)
+            .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+            .header("Retry-After", "60")
+            .bodyValue(Map.of(
+                "title", "请求过于频繁",
+                "status", HttpStatus.TOO_MANY_REQUESTS.value(),
+                "detail", detail));
     }
 
     private static FetchResult fetchDocument(String initialUrl) throws Exception {
