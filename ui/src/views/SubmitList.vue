@@ -17,6 +17,7 @@ import {
   Toast,
   IconExternalLinkLine,
   IconRefreshLine,
+  IconSave,
 } from "@halo-dev/components";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/vue-query";
 import { computed, ref, watch } from "vue";
@@ -29,6 +30,7 @@ import { linkSubmitStatusOptions, linkSubmitTypeOptions } from "@/constant";
 import CheckModal from "@/components/CheckModal.vue";
 import ListFilterSelect from "@/components/ListFilterSelect.vue";
 import { utils } from "@halo-dev/ui-shared";
+import { downloadCsv } from "@/utils/csv";
 
 const queryClient = useQueryClient();
 
@@ -146,6 +148,27 @@ function statusText(status: string) {
 function typeText(type: string) {
   const item = linkSubmitTypeOptions.find((option) => option.value === type);
   return item ? item.label : "未知";
+}
+
+function exportCurrentPage() {
+  const items = linkSubmits.value || [];
+  if (!items.length) return;
+  downloadCsv(
+    `友链申请-第${page.value}页.csv`,
+    ["网站名称", "网址", "邮箱", "分组", "类型", "状态", "提交时间"],
+    items.map((item) => [
+      item.spec.displayName,
+      item.spec.url,
+      item.spec.email,
+      getGroup(item.spec.groupName || ""),
+      typeText(item.spec.type),
+      statusText(item.spec.status),
+      item.metadata.creationTimestamp
+        ? utils.date.format(item.metadata.creationTimestamp)
+        : "",
+    ]),
+  );
+  Toast.success(`已导出当前页 ${items.length} 条记录`);
 }
 
 const handleCheckAllChange = (e: Event) => {
@@ -270,6 +293,18 @@ const handleOpenCheckModal = (linkSubmit?: LinkSubmit) => {
               label="排序"
               :items="sortOptions"
             />
+            <VButton
+              v-if="linkSubmits?.length"
+              v-permission="['plugin:link:submit-next:manage']"
+              v-tooltip="'导出当前筛选结果的本页记录'"
+              aria-label="导出当前页友链申请"
+              size="sm"
+              type="secondary"
+              @click="exportCurrentPage"
+            >
+              <template #icon><IconSave class=":uno: h-4 w-4" /></template>
+              导出当前页
+            </VButton>
             <div class=":uno: flex flex-row items-end gap-2">
               <VButton v-tooltip="'刷新'" aria-label="刷新友链申请" size="sm" ghost @click="refetch()">
                 <template #icon>
