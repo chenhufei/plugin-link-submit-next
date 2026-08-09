@@ -4,11 +4,17 @@ import { useRouteQuery } from "@vueuse/router";
 import LinkVariantPlus from "~icons/mdi/link-variant-plus";
 
 import {
+  IconArrowLeft,
+  VButton,
   VCard,
   VPageHeader,
   VTabbar,
 } from "@halo-dev/components";
 import SubmitList from "@/views/SubmitList.vue";
+
+function returnToLinks() {
+  window.location.assign("/console/links");
+}
 
 const tabs = [
   {
@@ -30,6 +36,12 @@ const activeIndex = useRouteQuery<string>("tab", tabs[0].id);
   <VPageHeader title="友链自助提交管理">
     <template #icon>
       <LinkVariantPlus class=":uno: mr-2 self-center"/>
+    </template>
+    <template #actions>
+      <VButton size="sm" @click="returnToLinks">
+        <template #icon><IconArrowLeft /></template>
+        返回链接管理
+      </VButton>
     </template>
   </VPageHeader>
 

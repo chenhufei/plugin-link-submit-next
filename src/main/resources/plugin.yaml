@@ -9,7 +9,7 @@ spec:
   requires: ">=2.25.0"
   pluginDependencies:
     "PluginLinks": ">=2.0.0"
-  version: "1.0.17"
+  version: "1.0.21"
   author:
     name: chenhufei
     website: https://github.com/chenhufei
@@ -20,7 +20,7 @@ spec:
   configMapName: link-submit-next-configmap
   settingName: link-submit-next-settings
   displayName: "友链自助提交 Next"
-  description: "访问者可以自助提交友链，并在后台管理页面进行审核。"
+  description: "基于官方 PluginLinks 的友链自助提交与审核插件，提供表单、健康检测、预览、通知和定时处理。"
   license:
     - name: "GPL-3.0"
       url: "https://www.gnu.org/licenses/gpl-3.0.html"
