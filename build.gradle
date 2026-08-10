@@ -73,6 +73,31 @@ halo {
     suspend = true
 }
 
+tasks.register('verifyVersionConsistency') {
+    group = 'verification'
+    description = 'Verify plugin.yaml version matches the Gradle project version.'
+    inputs.file(layout.projectDirectory.file('src/main/resources/plugin.yaml'))
+    doLast {
+        def expectedVersion = project.version.toString()
+        def pluginYaml = layout.projectDirectory
+            .file('src/main/resources/plugin.yaml').asFile.getText('UTF-8')
+        def versionMatcher = pluginYaml =~ /(?m)^\s{2}version:\s*["']?([^"'\s]+)["']?\s*$/
+        if (!versionMatcher.find()) {
+            throw new GradleException('Unable to read spec.version from plugin.yaml')
+        }
+        def pluginVersion = versionMatcher.group(1)
+        if (pluginVersion != expectedVersion) {
+            throw new GradleException(
+                "Version mismatch: Gradle=${expectedVersion}, plugin.yaml=${pluginVersion}"
+            )
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn('verifyVersionConsistency')
+}
+
 haloPlugin {
     openApi {
         outputDir = file("$rootDir/api-docs/openapi/v3_0")
