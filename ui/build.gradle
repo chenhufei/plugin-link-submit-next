@@ -5,11 +5,22 @@ plugins {
 
 group 'run.halo.linksubmit.ui'
 
+node {
+    download = true
+    version = '24.14.0'
+    pnpmVersion = '10.22.0'
+}
+
+tasks.register('installDepsForUI', PnpmTask) {
+    args = ['install', '--frozen-lockfile']
+    environment = ['CI': 'true']
+}
+
 tasks.register('buildFrontend', PnpmTask) {
     group = 'build'
     description = 'Build the UI project using pnpm'
     args = ['build']
-    dependsOn tasks.named('pnpmInstall')
+    dependsOn tasks.named('installDepsForUI')
     inputs.dir(layout.projectDirectory.dir('src'))
     inputs.files(fileTree(
         dir: layout.projectDirectory,

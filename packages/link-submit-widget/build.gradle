@@ -2,6 +2,17 @@ plugins {
     id "com.github.node-gradle.node" version "7.1.0"
 }
 
+node {
+    download = true
+    version = '24.14.0'
+    pnpmVersion = '10.22.0'
+}
+
+tasks.register('installDepsForWidget', PnpmTask) {
+    args = ['install', '--frozen-lockfile']
+    environment = ['CI': 'true']
+}
+
 tasks.register('clean', Delete) {
     delete layout.buildDirectory
 }
@@ -9,7 +20,7 @@ tasks.register('clean', Delete) {
 tasks.register('build', PnpmTask) {
     group = 'build'
     description = 'Build link-submit-widget package.'
-    dependsOn tasks.named('pnpmInstall')
+    dependsOn tasks.named('installDepsForWidget')
     pnpmCommand = ['run', 'build']
     inputs.dir('src')
     inputs.files(fileTree('node_modules').exclude('.cache'))
@@ -22,7 +33,7 @@ tasks.register('build', PnpmTask) {
 tasks.register('testFrontend', PnpmTask) {
     group = 'verification'
     description = 'Run link submit widget unit tests.'
-    dependsOn tasks.named('pnpmInstall')
+    dependsOn tasks.named('installDepsForWidget')
     pnpmCommand = ['run', 'test:ci']
     inputs.dir('src')
     inputs.files('package.json', 'vitest.config.ts', 'vite.config.lib.ts')

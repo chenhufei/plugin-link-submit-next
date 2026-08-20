@@ -1,7 +1,21 @@
 import { fileURLToPath } from 'url';
+import { cpSync, mkdirSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
-import { viteStaticCopy as StaticCopy } from 'vite-plugin-static-copy';
+
+function syncRuntimeAssets() {
+  return {
+    name: 'sync-runtime-assets',
+    closeBundle() {
+      const runtimeDirectory = fileURLToPath(
+        new URL('../../src/main/resources/static', import.meta.url),
+      );
+      mkdirSync(runtimeDirectory, { recursive: true });
+      cpSync('dist/link-submit-widget.iife.js', `${runtimeDirectory}/link-submit-widget.iife.js`);
+      cpSync('var.css', `${runtimeDirectory}/var.css`);
+    },
+  };
+}
 
 export default defineConfig({
   build: {
@@ -18,15 +32,5 @@ export default defineConfig({
       },
     },
   },
-  plugins: [
-    dts(),
-    StaticCopy({
-      targets: [
-        {
-          src: ['./dist/link-submit-widget.iife.js', './var.css'],
-          dest: fileURLToPath(new URL('../../src/main/resources/static', import.meta.url)),
-        },
-      ],
-    }),
-  ],
+  plugins: [dts(), syncRuntimeAssets()],
 });
