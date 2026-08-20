@@ -1,11 +1,7 @@
 package run.halo.linksubmit.endpoint;
 
-import run.halo.linksubmit.extension.LinkSubmit;
-import run.halo.linksubmit.service.LinkService;
-import run.halo.linksubmit.service.LinkSubmitService;
 import run.halo.linksubmit.service.SettingConfigLinkSubmit;
 import run.halo.linksubmit.utils.IpAddressUtils;
-import run.halo.linksubmit.vo.LinkGroupVo;
 import run.halo.linksubmit.utils.SafeUrlValidator;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
@@ -13,13 +9,10 @@ import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import io.github.resilience4j.reactor.ratelimiter.operator.RateLimiterOperator;
 import jakarta.annotation.PreDestroy;
-import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import org.springdoc.core.fn.builders.schema.Builder;
 import org.springdoc.webflux.core.fn.SpringdocRouteBuilder;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
@@ -34,7 +27,6 @@ import run.halo.app.extension.GroupVersion;
 
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,7 +34,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.springdoc.core.fn.builders.apiresponse.Builder.responseBuilder;
 import static org.springdoc.core.fn.builders.content.Builder.contentBuilder;
 import static org.springdoc.core.fn.builders.parameter.Builder.parameterBuilder;
-import static org.springdoc.core.fn.builders.requestbody.Builder.requestBodyBuilder;
 
 @Slf4j
 @Component
@@ -50,6 +41,8 @@ public class AnonymousEndpoint implements CustomEndpoint {
 
     private static final String TAG = "api.link.submit.halo.run/v1alpha1/LinkSubmit";
     static final int SITE_INFO_LIMIT_PER_MINUTE = 12;
+    static final int SITE_INFO_MAX_BODY_BYTES = 1024 * 1024;
+    private static final int MAX_TRACKED_LIMITERS = 10_000;
     static final RateLimiterConfig SITE_INFO_RATE_LIMITER_CONFIG = RateLimiterConfig.custom()
         .limitForPeriod(SITE_INFO_LIMIT_PER_MINUTE)
         .limitRefreshPeriod(Duration.ofMinutes(1))
@@ -58,20 +51,14 @@ public class AnonymousEndpoint implements CustomEndpoint {
 
     private final SettingConfigLinkSubmit settingConfigLinkSubmit;
 
-    private final LinkService linkService;
-
-    private final LinkSubmitService linkSubmitService;
-
     private final RateLimiterRegistry rateLimiterRegistry;
 
     private final Set<String> limiterNames = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<String, Long> limiterLastUsed = new ConcurrentHashMap<>();
 
     public AnonymousEndpoint(SettingConfigLinkSubmit settingConfigLinkSubmit,
-        LinkService linkService, LinkSubmitService linkSubmitService,
         RateLimiterRegistry rateLimiterRegistry) {
         this.settingConfigLinkSubmit = settingConfigLinkSubmit;
-        this.linkService = linkService;
-        this.linkSubmitService = linkSubmitService;
         this.rateLimiterRegistry = rateLimiterRegistry;
     }
 
@@ -79,6 +66,7 @@ public class AnonymousEndpoint implements CustomEndpoint {
     void cleanup() {
         limiterNames.forEach(rateLimiterRegistry::remove);
         limiterNames.clear();
+        limiterLastUsed.clear();
     }
 
     @Override
@@ -90,15 +78,6 @@ public class AnonymousEndpoint implements CustomEndpoint {
                     .tag(TAG)
                     .response(responseBuilder().implementation(Map.class));
             })
-            .GET("linkgroups", this::linkGroups, builder -> {
-                builder.operationId("linkGroups")
-                    .description("友链分组")
-                    .tag(TAG)
-                    .response(
-                        responseBuilder()
-                            .implementationArray(LinkGroupVo.class)
-                    );
-            })
             .GET("site-info", this::fetchSiteInfo,
                 builder -> builder.operationId("fetchSiteInfo")
                     .description("根据网址获取网站标题、描述、Logo等信息")
@@ -109,20 +88,6 @@ public class AnonymousEndpoint implements CustomEndpoint {
                         .required(true))
                     .response(responseBuilder()
                         .implementation(Map.class))
-            )
-            .POST("linksubmits/-/submit", this::submit,
-                builder -> builder.operationId("submit")
-                    .description("自助提交友链")
-                    .tag(TAG)
-                    .requestBody(requestBodyBuilder()
-                        .required(true)
-                        .content(contentBuilder()
-                            .mediaType(MediaType.APPLICATION_JSON_VALUE)
-                            .schema(Builder.schemaBuilder()
-                                .implementation(CreateLinkSubmitRequest.class))
-                        ))
-                    .response(responseBuilder()
-                        .implementation(LinkSubmit.class))
             ).build();
     }
 
@@ -130,46 +95,6 @@ public class AnonymousEndpoint implements CustomEndpoint {
         return settingConfigLinkSubmit.getBasicConfig()
             .flatMap(config -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(Map.of("linkPreviewEnabled", config.isEnableLinkPreview())));
-    }
-
-    Mono<ServerResponse> linkGroups(ServerRequest request) {
-        var basicConfig = settingConfigLinkSubmit.getBasicConfig();
-
-        return basicConfig.flatMap(basic -> {
-            List<String> forbidSelectedGroupNames = basic.getForbidSelectedGroupName();
-
-            return linkService.listGroup()
-                .filter(linkGroupVo -> {
-                    if (forbidSelectedGroupNames != null) {
-                       return !forbidSelectedGroupNames.contains(linkGroupVo.getGroupName());
-                    }
-                    return true;
-                }).collectList();
-        }).flatMap(linkGroupVoList -> ServerResponse.ok().bodyValue(linkGroupVoList));
-    }
-
-    Mono<ServerResponse> submit(ServerRequest request) {
-        String clientIp = IpAddressUtils.getIpAddress(request);
-        String limiterName = "submit-link-" + clientIp;
-        limiterNames.add(limiterName);
-        RateLimiter rateLimiter = this.rateLimiterRegistry.rateLimiter(limiterName);
-        return request.bodyToMono(CreateLinkSubmitRequest.class)
-            .flatMap(req -> linkSubmitService.createLinkSubmit(req, clientIp))
-            .transformDeferred(RateLimiterOperator.of(rateLimiter))
-            .flatMap(resultsVo -> ServerResponse.ok().bodyValue(resultsVo))
-            .onErrorResume(RequestNotPermitted.class,
-                e -> tooManyRequests("提交过于频繁，请稍后再试"))
-            .onErrorResume(e -> {
-                log.error("Link submit failed: {}", e.getMessage(), e);
-                org.springframework.web.server.ResponseStatusException ex;
-                if (e instanceof org.springframework.web.server.ResponseStatusException) {
-                    ex = (org.springframework.web.server.ResponseStatusException) e;
-                } else {
-                    ex = new org.springframework.web.server.ResponseStatusException(
-                        org.springframework.http.HttpStatus.BAD_REQUEST, e.getMessage(), e);
-                }
-                return Mono.error(ex);
-            });
     }
 
     /**
@@ -180,6 +105,8 @@ public class AnonymousEndpoint implements CustomEndpoint {
         String clientIp = IpAddressUtils.getIpAddress(request);
         String limiterName = "site-info-" + clientIp;
         limiterNames.add(limiterName);
+        limiterLastUsed.put(limiterName, System.currentTimeMillis());
+        pruneLimitersIfNeeded();
         RateLimiter rateLimiter = rateLimiterRegistry.rateLimiter(
             limiterName, SITE_INFO_RATE_LIMITER_CONFIG);
         String url = request.queryParam("url").orElse("").trim();
@@ -276,6 +203,22 @@ public class AnonymousEndpoint implements CustomEndpoint {
         });
     }
 
+    private void pruneLimitersIfNeeded() {
+        if (limiterLastUsed.size() <= MAX_TRACKED_LIMITERS) {
+            return;
+        }
+        limiterLastUsed.entrySet().stream()
+            .sorted(Map.Entry.comparingByValue())
+            .limit(Math.max(1, limiterLastUsed.size() - MAX_TRACKED_LIMITERS))
+            .map(Map.Entry::getKey)
+            .toList()
+            .forEach(name -> {
+                limiterLastUsed.remove(name);
+                limiterNames.remove(name);
+                rateLimiterRegistry.remove(name);
+            });
+    }
+
     private static Mono<ServerResponse> tooManyRequests(String detail) {
         return ServerResponse.status(HttpStatus.TOO_MANY_REQUESTS)
             .contentType(MediaType.APPLICATION_PROBLEM_JSON)
@@ -293,9 +236,10 @@ public class AnonymousEndpoint implements CustomEndpoint {
             var response = Jsoup.connect(current)
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+                .header("Accept", "text/html,application/xhtml+xml;q=0.9")
                 .timeout(8000)
+                .maxBodySize(SITE_INFO_MAX_BODY_BYTES)
                 .followRedirects(false)
-                .ignoreContentType(true)
                 .ignoreHttpErrors(true)
                 .execute();
             int status = response.statusCode();
@@ -311,6 +255,14 @@ public class AnonymousEndpoint implements CustomEndpoint {
             if (status < 200 || status >= 400) {
                 throw new java.io.IOException("目标网站返回 HTTP " + status);
             }
+            String contentType = response.contentType();
+            String normalizedContentType = contentType == null
+                ? "" : contentType.toLowerCase(java.util.Locale.ROOT);
+            if (!normalizedContentType.isBlank()
+                && !normalizedContentType.startsWith("text/html")
+                && !normalizedContentType.startsWith("application/xhtml+xml")) {
+                throw new IllegalArgumentException("目标网站不是 HTML 页面");
+            }
             return new FetchResult(response.parse());
         }
         throw new IllegalArgumentException("目标网站重定向次数过多");
@@ -320,44 +272,22 @@ public class AnonymousEndpoint implements CustomEndpoint {
     }
 
     /** 将相对 URL 转为绝对 URL */
-    private static String absUrl(String href, String baseUrl) {
+    static String absUrl(String href, String baseUrl) {
         if (href == null || href.isEmpty()) return null;
-        if (href.startsWith("http://") || href.startsWith("https://")) return href;
-        if (href.startsWith("//")) return "https:" + href;
         try {
-            return new java.net.URL(new java.net.URL(baseUrl), href).toString();
+            java.net.URI resolved = java.net.URI.create(baseUrl).resolve(href.trim());
+            String scheme = resolved.getScheme();
+            if (!("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
+                return null;
+            }
+            try {
+                return SafeUrlValidator.requirePublicHttpUrl(resolved.toString()).toString();
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
         } catch (Exception e) {
             return null;
         }
-    }
-
-    @Data
-    public static class CreateLinkSubmitRequest {
-
-        @NotBlank
-        private String url;
-
-        @NotBlank
-        private String displayName;
-
-        private String logo;
-
-        private String description;
-
-        private String oldUrl;
-
-        private String email;
-
-        @NotBlank
-        private String groupName;
-
-        private String rssUrl;
-
-        private String message;
-
-        @NotBlank
-        private LinkSubmit.LinkSubmitType type;
-
     }
 
     @Override

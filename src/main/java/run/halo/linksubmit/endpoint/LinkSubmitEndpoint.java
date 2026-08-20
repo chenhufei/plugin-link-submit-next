@@ -3,13 +3,8 @@ package run.halo.linksubmit.endpoint;
 import run.halo.linksubmit.LinkSubmitQuery;
 import run.halo.linksubmit.extension.LinkSubmit;
 import run.halo.linksubmit.service.LinkSubmitService;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import org.springdoc.core.fn.builders.schema.Builder;
 import org.springdoc.webflux.core.fn.SpringdocRouteBuilder;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -20,9 +15,6 @@ import run.halo.app.extension.GroupVersion;
 import run.halo.app.extension.ListResult;
 
 import static org.springdoc.core.fn.builders.apiresponse.Builder.responseBuilder;
-import static org.springdoc.core.fn.builders.content.Builder.contentBuilder;
-import static org.springdoc.core.fn.builders.parameter.Builder.parameterBuilder;
-import static org.springdoc.core.fn.builders.requestbody.Builder.requestBodyBuilder;
 
 @Component
 @RequiredArgsConstructor
@@ -45,24 +37,6 @@ public class LinkSubmitEndpoint implements CustomEndpoint {
                     LinkSubmitQuery.buildParameters(builder);
                 }
             )
-            .POST("linksubmits/{name}/check", this::check,
-                builder -> builder.operationId("check")
-                    .description("友链提交审核操作")
-                    .tag(TAG)
-                    .parameter(parameterBuilder().name("name")
-                        .in(ParameterIn.PATH)
-                        .required(true)
-                        .implementation(String.class))
-                    .requestBody(requestBodyBuilder()
-                        .required(true)
-                        .content(contentBuilder()
-                            .mediaType(MediaType.APPLICATION_JSON_VALUE)
-                            .schema(Builder.schemaBuilder()
-                                .implementation(CheckLinkSubmitRequest.class))
-                        ))
-                    .response(responseBuilder()
-                        .implementation(LinkSubmit.class))
-            )
             .build();
     }
 
@@ -70,25 +44,6 @@ public class LinkSubmitEndpoint implements CustomEndpoint {
         LinkSubmitQuery query = new LinkSubmitQuery(request);
         return linkSubmitService.listLinkSubmit(query)
             .flatMap(linkSubmits -> ServerResponse.ok().bodyValue(linkSubmits));
-    }
-
-    Mono<ServerResponse> check(ServerRequest request) {
-        var name = request.pathVariable("name");
-        return request.bodyToMono(CheckLinkSubmitRequest.class)
-            .flatMap(checkLinkSubmitRequest -> linkSubmitService.checkLink(name,checkLinkSubmitRequest))
-            .flatMap(linkSubmit -> ServerResponse.ok().bodyValue(linkSubmit));
-    }
-
-    @Data
-    public static class CheckLinkSubmitRequest {
-
-        @NotBlank
-        private Boolean checkStatus;
-
-        private String reason;
-
-        private String linkName;
-
     }
 
     @Override

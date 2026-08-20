@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'run.halo.linksubmit'
-version '1.1.1'
+version '1.2.3'
 
 repositories {
     mavenCentral()
@@ -16,7 +16,6 @@ repositories {
 
 dependencies {
     implementation platform('run.halo.tools.platform:plugin:2.25.0')
-    implementation 'cn.hutool:hutool-all:5.8.25'
     compileOnly 'run.halo.app:api'
 
     testImplementation 'run.halo.app:api'
@@ -53,30 +52,15 @@ tasks.named('classes') {
 
 halo {
     version = '2.25.0'
-    superAdminUsername = 'admin'
-    superAdminPassword = 'admin'
-    externalUrl = 'http://localhost:8081'
-    docker {
-        // windows 需要改为 npipe:////./pipe/docker_engine
-        // linux、macos 需要改为 unix:///var/run/docker.sock
-        url = 'npipe:////./pipe/docker_engine'
-        apiVersion = '1.47'
-    }
-    port = 8081
-
-    // 开启 debug 断点模式
-    debug = true
-    debugPort = 5005
-
-    containerName = 'link-submit-next'
-    // 控制台会挂起，等待点击 Attach debugger 按钮
-    suspend = true
 }
 
 tasks.register('verifyVersionConsistency') {
     group = 'verification'
     description = 'Verify plugin.yaml version matches the Gradle project version.'
-    inputs.file(layout.projectDirectory.file('src/main/resources/plugin.yaml'))
+    inputs.files(
+        layout.projectDirectory.file('src/main/resources/plugin.yaml'),
+        layout.projectDirectory.file('packages/link-submit-widget/package.json')
+    )
     doLast {
         def expectedVersion = project.version.toString()
         def pluginYaml = layout.projectDirectory
@@ -91,11 +75,117 @@ tasks.register('verifyVersionConsistency') {
                 "Version mismatch: Gradle=${expectedVersion}, plugin.yaml=${pluginVersion}"
             )
         }
+        def widgetPackage = new groovy.json.JsonSlurper().parse(
+            layout.projectDirectory.file('packages/link-submit-widget/package.json').asFile
+        )
+        if (widgetPackage.version?.toString() != expectedVersion) {
+            throw new GradleException(
+                "Version mismatch: Gradle=${expectedVersion}, widget=${widgetPackage.version}"
+            )
+        }
+    }
+}
+
+tasks.register('verifyPublicationMetadata') {
+    group = 'verification'
+    description = 'Reject placeholder store metadata and preserve source attribution.'
+    inputs.files(
+        layout.projectDirectory.file('src/main/resources/plugin.yaml'),
+        layout.projectDirectory.file('packages/link-submit-widget/package.json'),
+        layout.projectDirectory.file('README.md')
+    )
+    doLast {
+        def pluginYaml = layout.projectDirectory
+            .file('src/main/resources/plugin.yaml').asFile.getText('UTF-8')
+        if (pluginYaml =~ /store\.halo\.run\/app-id:\s*["']?app-(?:link-submit-next|TODO|CHANGE_ME)["']?/) {
+            throw new GradleException('Plugin metadata contains a placeholder or upstream store app id.')
+        }
+        def widgetPackage = new groovy.json.JsonSlurper().parse(
+            layout.projectDirectory.file('packages/link-submit-widget/package.json').asFile
+        )
+        if (widgetPackage.name.toString().startsWith('@halo-dev/')) {
+            throw new GradleException('The widget package must not use the @halo-dev namespace.')
+        }
+        if (widgetPackage.author?.url?.toString() != 'https://github.com/chenhufei') {
+            throw new GradleException('Widget author metadata must identify the current maintainer.')
+        }
+        def contributors = widgetPackage.contributors*.url*.toString()
+        if (!contributors.contains('https://github.com/chengzhongxue')) {
+            throw new GradleException('Widget metadata must retain the upstream author attribution.')
+        }
+        def readme = layout.projectDirectory.file('README.md').asFile.getText('UTF-8')
+        ['chengzhongxue/link-submit', 'PluginLinks'].each { marker ->
+            if (!readme.contains(marker)) {
+                throw new GradleException("README is missing required source/boundary attribution: ${marker}")
+            }
+        }
+    }
+}
+
+tasks.register('verifyEnhancementBoundary') {
+    group = 'verification'
+    description = 'Ensure the plugin remains an enhancement for official PluginLinks.'
+    inputs.files(
+        layout.projectDirectory.file('src/main/java/run/halo/linksubmit/endpoint/AnonymousEndpoint.java'),
+        layout.projectDirectory.file('src/main/java/run/halo/linksubmit/endpoint/LinkSubmitEndpoint.java'),
+        layout.projectDirectory.file('src/main/java/run/halo/linksubmit/LinkSubmitReconciler.java'),
+        layout.projectDirectory.file('src/main/java/run/halo/linksubmit/NotificationReasonPublisher.java'),
+        layout.projectDirectory.file('ui/src/views/HomeView.vue'),
+        layout.projectDirectory.file('packages/link-submit-widget/src/link-submit-modal.ts'),
+        layout.projectDirectory.file('src/main/resources/plugin.yaml')
+    )
+    doLast {
+        def anonymousEndpoint = layout.projectDirectory
+            .file('src/main/java/run/halo/linksubmit/endpoint/AnonymousEndpoint.java')
+            .asFile.getText('UTF-8')
+        def consoleEndpoint = layout.projectDirectory
+            .file('src/main/java/run/halo/linksubmit/endpoint/LinkSubmitEndpoint.java')
+            .asFile.getText('UTF-8')
+        ['linksubmits/-/submit', '.POST("linksubmits'].each { forbidden ->
+            if (anonymousEndpoint.contains(forbidden) || consoleEndpoint.contains(forbidden)) {
+                throw new GradleException("Legacy link submission write API is forbidden: ${forbidden}")
+            }
+        }
+
+        [
+            'src/main/java/run/halo/linksubmit/LinkSubmitReconciler.java',
+            'src/main/java/run/halo/linksubmit/NotificationReasonPublisher.java'
+        ].each { path ->
+            def source = layout.projectDirectory.file(path).asFile.getText('UTF-8')
+            if (source =~ /(?m)^\s*@Component\s*$/) {
+                throw new GradleException("Legacy side-effect component must stay disabled: ${path}")
+            }
+        }
+
+        def homeView = layout.projectDirectory.file('ui/src/views/HomeView.vue')
+            .asFile.getText('UTF-8')
+        ['SubmitList', '<Cron', '定时任务'].each { forbidden ->
+            if (homeView.contains(forbidden)) {
+                throw new GradleException("Enhancement console must not expose legacy workflow: ${forbidden}")
+            }
+        }
+
+        def widget = layout.projectDirectory
+            .file('packages/link-submit-widget/src/link-submit-modal.ts').asFile.getText('UTF-8')
+        ['api.link.halo.run/v1alpha1/link-applications', '/captcha'].each { required ->
+            if (!widget.contains(required)) {
+                throw new GradleException("Widget must use official PluginLinks API: ${required}")
+            }
+        }
+
+        def pluginYaml = layout.projectDirectory.file('src/main/resources/plugin.yaml')
+            .asFile.getText('UTF-8')
+        if (!pluginYaml.contains('"PluginLinks": ">=2.3.0"')) {
+            throw new GradleException('PluginLinks dependency must require the verified 2.3.0 API')
+        }
     }
 }
 
 tasks.named('check') {
     dependsOn('verifyVersionConsistency')
+    dependsOn('verifyPublicationMetadata')
+    dependsOn('verifyEnhancementBoundary')
+    dependsOn project(':packages:link-submit-widget').tasks.named('testFrontend')
 }
 
 haloPlugin {

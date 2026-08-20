@@ -40,7 +40,7 @@ describe('installLinksManagementEntry', () => {
     const entries = document.querySelectorAll('[data-link-submit-next-entry]')
     expect(entries).toHaveLength(1)
     expect(entries[0]?.getAttribute('href')).toBe('/console/tools/link-submit-next')
-    expect(entries[0]?.textContent).toContain('自助提交管理')
+    expect(entries[0]?.textContent).toContain('申请增强')
   })
 
   it('stays hidden without permission or an exact official page match', async () => {

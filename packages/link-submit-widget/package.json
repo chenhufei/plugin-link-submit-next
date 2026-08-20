@@ -1,13 +1,29 @@
 {
-    "name": "@halo-dev/link-submit-next-widget",
-    "author": {
-        "name": "困困鱼",
-        "url": "https://github.com/chengzhongxue"
+    "name": "@chenhufei/link-submit-next-widget",
+    "version": "1.2.3",
+    "description": "Halo 官方 PluginLinks 的友链自助提交增强 Widget",
+    "license": "GPL-3.0-only",
+    "homepage": "https://github.com/chenhufei/plugin-link-submit-next",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/chenhufei/plugin-link-submit-next.git",
+        "directory": "packages/link-submit-widget"
     },
-    "maintainers": [
+    "bugs": {
+        "url": "https://github.com/chenhufei/plugin-link-submit-next/issues"
+    },
+    "author": {
+        "name": "chenhufei",
+        "url": "https://github.com/chenhufei"
+    },
+    "contributors": [
         {
             "name": "困困鱼",
             "url": "https://github.com/chengzhongxue"
+        },
+        {
+            "name": "柳意梧情",
+            "url": "https://github.com/liuyiwuqing"
         }
     ],
     "type": "module",
@@ -34,30 +50,25 @@
         "test:ci": "vitest --run"
     },
     "dependencies": {
-        "lit": "^3.1.3",
-        "overlayscrollbars": "^2.10.0"
+        "lit": "^3.1.3"
     },
     "pnpm": {
         "onlyBuiltDependencies": ["esbuild"]
     },
     "devDependencies": {
-        "@iconify/json": "^2.2.216",
         "@rushstack/eslint-patch": "^1.7.2",
         "@types/node": "20",
         "@typescript-eslint/eslint-plugin": "^6.21.0",
         "@typescript-eslint/parser": "^6.21.0",
-        "@unocss/preset-icons": "^0.60.4",
-        "@unocss/reset": "^0.60.4",
         "eslint": "^8.57.0",
         "eslint-config-prettier": "^9.1.0",
         "eslint-plugin-prettier": "^5.1.3",
         "lit-analyzer": "^2.0.3",
         "prettier": "^3.3.0",
         "typescript": "^5.4.5",
-        "unocss": "^0.60.4",
-        "vite": "^5.2.12",
-        "vite-plugin-dts": "^3.9.1",
-        "vite-plugin-static-copy": "^1.0.6",
-        "vitest": "^1.6.0"
+        "vite": "^8.2.1",
+        "vite-plugin-dts": "^5.0.3",
+        "vite-plugin-static-copy": "^4.1.1",
+        "vitest": "^4.1.11"
     }
 }

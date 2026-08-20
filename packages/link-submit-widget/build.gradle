@@ -18,3 +18,12 @@ tasks.register('build', PnpmTask) {
     } as FileFilter))
     outputs.dir(layout.buildDirectory.dir('dist'))
 }
+
+tasks.register('testFrontend', PnpmTask) {
+    group = 'verification'
+    description = 'Run link submit widget unit tests.'
+    dependsOn tasks.named('pnpmInstall')
+    pnpmCommand = ['run', 'test:ci']
+    inputs.dir('src')
+    inputs.files('package.json', 'vitest.config.ts', 'vite.config.lib.ts')
+}

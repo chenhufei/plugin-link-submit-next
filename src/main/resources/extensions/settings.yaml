@@ -5,13 +5,13 @@ metadata:
 spec:
   forms:
     - group: basic
-      label: 提交审核
+      label: 前台增强
       formSchema:
         - $formkit: switch
           name: loadPlugInResources
           id: loadPlugInResources
           label: 加载插件资源
-          help: 主题自己适配提交弹框的可以关闭
+          help: 在友链页加载增强申请弹窗；申请数据、审核和通知由 Halo 官方链接插件负责
           value: true
         - $formkit: switch
           if: $get(loadPlugInResources).value
@@ -19,78 +19,10 @@ spec:
           id: displayTheSubmitButton
           key: displayTheSubmitButton
           label: 显示提交按钮
-          help: 显示页面提交按钮
-          value: true
-        - $formkit: switch
-          name: autoAudit
-          label: 开启自动审核
-          value: false
-        - $formkit: number
-          name: dailySubmitLimit
-          label: 每日提交上限
-          help: 同一 IP 每天最多提交次数，0 表示不限制
-          value: 0
-          min: 0
-        - $formkit: switch
-          name: enableHealthCheck
-          label: 启用链接健康检测
-          help: 提交时自动检测链接可达性、SSL 状态
+          help: 主题已经提供申请按钮时可关闭，仍可通过 LinkSubmitWidget.open() 打开弹窗
           value: true
         - $formkit: switch
           name: enableLinkPreview
-          label: 启用链接预览
-          help: 提交时自动抓取网站标题、描述、favicon
+          label: 自动获取网站信息
+          help: 允许访客通过服务端安全代理获取网站标题、描述和 Logo；不会代替官方申请校验
           value: true
-    - group: notification
-      label: 消息通知
-      formSchema:
-        - $formkit: switch
-          name: sendEmail
-          id: sendEmail
-          key: sendEmail
-          label: 发送邮件通知
-          value: false
-        - $formkit: text
-          if: $get(sendEmail).value === true
-          id: adminEmail
-          name: adminEmail
-          key: adminEmail
-          value: ""
-          label: 管理员邮箱
-          help: 管理员邮箱，用于接收邮件通知
-          validation: required|email
-    - group: link
-      label: 友链分组
-      formSchema:
-        - $formkit: select
-          id: groupName
-          name: groupName
-          key: groupName
-          label: 默认友链分组
-          clearable: true
-          action: /apis/core.halo.run/v1alpha1/linkgroups
-          requestOption:
-            method: GET
-            pageField: page
-            sizeField: size
-            totalField: total
-            itemsField: items
-            labelField: spec.displayName
-            valueField: metadata.name
-        - $formkit: select
-          id: forbidSelectedGroupName
-          name: forbidSelectedGroupName
-          key: forbidSelectedGroupName
-          label: 禁止自助提交的分组
-          multiple: true
-          clearable: true
-          action: /apis/core.halo.run/v1alpha1/linkgroups
-          requestOption:
-            method: GET
-            pageField: page
-            sizeField: size
-            totalField: total
-            itemsField: items
-            labelField: spec.displayName
-            valueField: metadata.name
-          help: 友链提交页面中禁止显示的分组

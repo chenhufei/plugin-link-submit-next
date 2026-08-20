@@ -20,9 +20,10 @@ function isLinksConsolePage() {
 
 function findLinksHeaderActions() {
   return [...document.querySelectorAll<HTMLElement>('.page-header')]
-    .find((header) =>
-      header.querySelector<HTMLElement>('.page-header__title-text')?.textContent?.trim() ===
-      '链接',
+    .find(
+      (header) =>
+        header.querySelector<HTMLElement>('.page-header__title-text')?.textContent?.trim() ===
+        '链接',
     )
     ?.querySelector<HTMLElement>('.page-header__actions')
 }
@@ -32,11 +33,11 @@ function createEntry() {
   entry.href = SUBMIT_CONSOLE_PATH
   entry.className = 'btn-sm btn-secondary btn'
   entry.setAttribute(ENTRY_ATTRIBUTE, '')
-  entry.setAttribute('aria-label', '进入友链自助提交管理')
+  entry.setAttribute('aria-label', '进入友链申请增强设置')
 
   const content = document.createElement('span')
   content.className = 'btn-content'
-  content.textContent = '自助提交管理'
+  content.textContent = '申请增强'
   entry.append(content)
   return entry
 }

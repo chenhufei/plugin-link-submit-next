@@ -9,3 +9,7 @@ document.body.append(linkSubmitModalElement);
 export function open() {
   linkSubmitModalElement.open = true;
 }
+
+document.querySelectorAll<HTMLElement>('[data-link-submit-widget-trigger]').forEach((trigger) => {
+  trigger.addEventListener('click', open);
+});

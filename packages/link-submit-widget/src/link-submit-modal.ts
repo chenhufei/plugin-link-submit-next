@@ -1,57 +1,56 @@
-import resetStyles from '@unocss/reset/tailwind.css?inline';
-import { styleMap } from 'lit/directives/style-map.js';
-import { LitElement, PropertyValues, css, html, unsafeCSS } from 'lit';
+import { LitElement, PropertyValues, css, html } from 'lit';
 import { property, state } from 'lit/decorators.js';
-import { OverlayScrollbars } from 'overlayscrollbars';
-import overlayscrollbarsStyles from 'overlayscrollbars/styles/overlayscrollbars.css?inline';
-import baseStyles from './styles/base';
 
-interface LinkGroup {
-  displayName: string;
-  groupName: string;
-  priority: number;
+const OFFICIAL_APPLICATION_API = '/apis/api.link.halo.run/v1alpha1/link-applications';
+const CAPTCHA_API = `${OFFICIAL_APPLICATION_API}/captcha`;
+
+interface ProblemResponse {
+  detail?: string;
+  title?: string;
 }
 
-interface ErrorResponse {
-  type: string;
-  title: string;
-  status: number;
-  detail: string;
-  instance: string;
-  requestId: string;
-  timestamp: string;
+interface CaptchaResponse {
+  challengeId: string;
+  image: string;
+  expiresInSeconds: number;
 }
 
-interface SuccessResponse {
-  spec: {
-    status: string;
+interface ApplicationResponse {
+  id: string;
+  status: string;
+}
+
+export function createOfficialApplicationPayload(formData: FormData, challengeId: string) {
+  const rssUrl = String(formData.get('rssUrl') || '').trim();
+  return {
+    url: String(formData.get('url') || '').trim(),
+    displayName: String(formData.get('displayName') || '').trim(),
+    logo: String(formData.get('logo') || '').trim() || null,
+    description: String(formData.get('description') || '').trim() || null,
+    email: String(formData.get('email') || '').trim() || null,
+    backlink: String(formData.get('backlink') || '').trim() || null,
+    feedUrls: rssUrl ? [rssUrl] : [],
+    challengeId,
+    captchaCode: String(formData.get('captchaCode') || '').trim(),
   };
 }
 
+async function parseResponse<T>(response: Response): Promise<T | null> {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error('接口返回格式错误');
+  }
+}
+
 export class LinkSubmitModal extends LitElement {
-  @property({
-    type: Boolean,
-    reflect: true,
-  })
+  @property({ type: Boolean, reflect: true })
   open = false;
 
   @state()
-  private groups: LinkGroup[] = [];
-
-  @state()
-  private loading = true;
-
-  @state()
   private submitting = false;
-
-  @state()
-  private toastMessage = '';
-
-  @state()
-  private toastType: 'success' | 'error' = 'success';
-
-  @state()
-  private selectedType = '';
 
   @state()
   private fetchingSite = false;
@@ -59,70 +58,65 @@ export class LinkSubmitModal extends LitElement {
   @state()
   private sitePreviewEnabled = true;
 
-  private lastFetchedSiteInfo = {
-    title: '',
-    logo: '',
-    description: '',
-  };
+  @state()
+  private captchaLoading = false;
+
+  @state()
+  private captcha?: CaptchaResponse;
+
+  @state()
+  private toastMessage = '';
+
+  @state()
+  private toastType: 'success' | 'error' = 'success';
+
+  private siteInfoRequest = 0;
+  private captchaRequest = 0;
+  private toastTimer?: number;
+  private captchaExpiryTimer?: number;
+  private previousBodyOverflow = '';
+  private lastFetchedSiteInfo = { title: '', logo: '', description: '' };
 
   constructor() {
     super();
-    this.fetchGroups();
-    this.fetchConfiguration();
-
-    setTimeout(() => {
-      const modalContent = this.shadowRoot?.querySelector('.modal__content') as HTMLElement;
-      if (modalContent) {
-        OverlayScrollbars(modalContent, {
-          scrollbars: {
-            autoHide: 'scroll',
-            autoHideDelay: 600,
-          },
-        });
-      }
-    }, 0);
+    void this.fetchConfiguration();
   }
 
   override willUpdate(changedProperties: PropertyValues) {
-    if (!changedProperties.has('open')) {
-      return;
-    }
-
+    if (!changedProperties.has('open')) return;
     if (this.open) {
+      this.previousBodyOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
+      if (!this.captcha) void this.fetchCaptcha();
     } else {
-      document.body.style.removeProperty('overflow');
+      document.body.style.overflow = this.previousBodyOverflow;
     }
+  }
+
+  override updated(changedProperties: PropertyValues) {
+    if (changedProperties.has('open') && this.open) {
+      requestAnimationFrame(() =>
+        this.shadowRoot?.querySelector<HTMLInputElement>('#input-url')?.focus()
+      );
+    }
+  }
+
+  override disconnectedCallback() {
+    this.siteInfoRequest += 1;
+    this.captchaRequest += 1;
+    window.clearTimeout(this.toastTimer);
+    window.clearTimeout(this.captchaExpiryTimer);
+    document.body.style.overflow = this.previousBodyOverflow;
+    super.disconnectedCallback();
   }
 
   private showToast(message: string, type: 'success' | 'error' = 'success') {
+    window.clearTimeout(this.toastTimer);
     this.toastMessage = message;
     this.toastType = type;
-    setTimeout(() => {
+    this.toastTimer = window.setTimeout(() => {
       this.toastMessage = '';
-    }, 3000);
-  }
-
-  private async fetchGroups() {
-    try {
-      const response = await fetch('/apis/api.link.submit.halo.run/v1alpha1/linkgroups', {
-        credentials: 'same-origin',
-        headers: { Accept: 'application/json' },
-      });
-      const text = await response.text();
-      let data: unknown;
-      try {
-        data = text ? JSON.parse(text) : null;
-      } catch {
-        throw new Error('友链分组接口返回格式错误');
-      }
-      if (!response.ok) throw new Error((data as ErrorResponse)?.detail || '友链分组加载失败');
-      this.groups = Array.isArray(data) ? (data as LinkGroup[]) : [];
-    } catch (error) {
-      console.error('Error fetching groups:', error);
-    } finally {
-      this.loading = false;
-    }
+    }, 3600);
   }
 
   private async fetchConfiguration() {
@@ -132,79 +126,102 @@ export class LinkSubmitModal extends LitElement {
         headers: { Accept: 'application/json' },
       });
       if (!response.ok) return;
-      const data = (await response.json()) as { linkPreviewEnabled?: boolean };
-      this.sitePreviewEnabled = data.linkPreviewEnabled !== false;
+      const data = await parseResponse<{ linkPreviewEnabled?: boolean }>(response);
+      this.sitePreviewEnabled = data?.linkPreviewEnabled !== false;
     } catch (error) {
-      console.error('Error fetching link submit configuration:', error);
+      console.error('Failed to load link enhancement configuration:', error);
     }
   }
 
-  private handleTypeChange(e: Event) {
-    const select = e.target as HTMLSelectElement;
-    this.selectedType = select.value;
+  private async fetchCaptcha() {
+    const requestId = ++this.captchaRequest;
+    this.captchaLoading = true;
+    window.clearTimeout(this.captchaExpiryTimer);
+    try {
+      const response = await fetch(CAPTCHA_API, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const data = await parseResponse<CaptchaResponse & ProblemResponse>(response);
+      if (requestId !== this.captchaRequest) return;
+      if (!response.ok || !data?.challengeId || !data.image) {
+        throw new Error(data?.detail || data?.title || '验证码加载失败');
+      }
+      this.captcha = data;
+      const refreshAfter = Math.max(15, data.expiresInSeconds - 10) * 1000;
+      this.captchaExpiryTimer = window.setTimeout(() => {
+        this.captcha = undefined;
+        if (this.open) void this.fetchCaptcha();
+      }, refreshAfter);
+    } catch (error) {
+      if (requestId === this.captchaRequest) {
+        this.captcha = undefined;
+        this.showToast(error instanceof Error ? error.message : '验证码加载失败', 'error');
+      }
+    } finally {
+      if (requestId === this.captchaRequest) this.captchaLoading = false;
+    }
   }
 
-  /**
-   * 根据网址获取网站信息（标题、描述、Logo）
-   * 调用插件后端代理端点，避免前端跨域问题和国内网络限制
-   */
   private async fetchSiteInfo() {
-    const urlInput = this.shadowRoot?.querySelector('#input-url') as HTMLInputElement;
-    if (!urlInput || !urlInput.value.trim()) {
+    const urlInput = this.shadowRoot?.querySelector<HTMLInputElement>('#input-url');
+    if (!urlInput?.value.trim()) {
       this.showToast('请先填写网址', 'error');
       return;
     }
 
     let url = urlInput.value.trim();
     if (!/^https?:\/\//i.test(url)) {
-      url = 'https://' + url;
+      url = `https://${url}`;
       urlInput.value = url;
     }
 
+    const requestId = ++this.siteInfoRequest;
     this.fetchingSite = true;
     try {
-      // 调用后端代理端点（服务端抓取，无 CORS 问题）
-      const apiUrl = `/apis/api.link.submit.halo.run/v1alpha1/site-info?url=${encodeURIComponent(url)}`;
-      const response = await fetch(apiUrl);
-      if (!response.ok) {
-        this.showToast('获取网站信息失败，请手动填写', 'error');
-        return;
-      }
-      const data = (await response.json()) as {
+      const response = await fetch(
+        `/apis/api.link.submit.halo.run/v1alpha1/site-info?url=${encodeURIComponent(url)}`,
+        { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' }
+      );
+      const data = await parseResponse<{
         title?: string;
         description?: string;
         logo?: string;
-      };
-      this.fillSiteInfo(data.title, data.logo, data.description);
-      if (data.title || data.description || data.logo) {
-        this.showToast('已自动填充网站信息');
-      } else {
-        this.showToast('未能获取到网站信息，请手动填写', 'error');
+        detail?: string;
+      }>(response);
+      if (requestId !== this.siteInfoRequest) return;
+      if (!response.ok) {
+        this.showToast(data?.detail || '获取网站信息失败，请手动填写', 'error');
+        return;
       }
-    } catch {
-      this.showToast('获取网站信息失败，请手动填写', 'error');
+      this.fillSiteInfo(data?.title, data?.logo, data?.description);
+      this.showToast(
+        data?.title || data?.description || data?.logo
+          ? '已自动填充网站信息'
+          : '未获取到网站信息，请手动填写',
+        data?.title || data?.description || data?.logo ? 'success' : 'error'
+      );
+    } catch (error) {
+      if (requestId === this.siteInfoRequest) {
+        this.showToast(error instanceof Error ? error.message : '获取网站信息失败', 'error');
+      }
     } finally {
-      this.fetchingSite = false;
+      if (requestId === this.siteInfoRequest) this.fetchingSite = false;
     }
   }
 
   private fillSiteInfo(title?: string, logo?: string, description?: string) {
-    const nameInput = this.shadowRoot?.querySelector('#input-name') as HTMLInputElement;
-    const logoInput = this.shadowRoot?.querySelector('#input-logo') as HTMLInputElement;
-    const descTextarea = this.shadowRoot?.querySelector(
-      '#textarea-description'
-    ) as HTMLTextAreaElement;
-
-    if (nameInput) {
-      this.replaceFetchedValue(nameInput, title, this.lastFetchedSiteInfo.title);
+    const nameInput = this.shadowRoot?.querySelector<HTMLInputElement>('#input-name');
+    const logoInput = this.shadowRoot?.querySelector<HTMLInputElement>('#input-logo');
+    const descriptionInput =
+      this.shadowRoot?.querySelector<HTMLTextAreaElement>('#textarea-description');
+    if (nameInput) this.replaceFetchedValue(nameInput, title, this.lastFetchedSiteInfo.title);
+    if (logoInput) this.replaceFetchedValue(logoInput, logo, this.lastFetchedSiteInfo.logo);
+    if (descriptionInput) {
+      this.replaceFetchedValue(descriptionInput, description, this.lastFetchedSiteInfo.description);
     }
-    if (logoInput) {
-      this.replaceFetchedValue(logoInput, logo, this.lastFetchedSiteInfo.logo);
-    }
-    if (descTextarea) {
-      this.replaceFetchedValue(descTextarea, description, this.lastFetchedSiteInfo.description);
-    }
-
     this.lastFetchedSiteInfo = {
       title: title?.trim() || '',
       logo: logo?.trim() || '',
@@ -218,416 +235,535 @@ export class LinkSubmitModal extends LitElement {
     previousFetchedValue: string
   ) {
     const currentValue = field.value.trim();
-    if (!currentValue || currentValue === previousFetchedValue) {
+    if (!currentValue || currentValue === previousFetchedValue)
       field.value = nextValue?.trim() || '';
-    }
   }
 
   private handleClose() {
+    this.siteInfoRequest += 1;
+    this.fetchingSite = false;
     this.open = false;
   }
 
-  private async handleSubmit(e: Event) {
-    e.preventDefault();
+  private handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.handleClose();
+    }
+  }
+
+  private async handleSubmit(event: SubmitEvent) {
+    event.preventDefault();
+    if (!this.captcha?.challengeId) {
+      this.showToast('验证码尚未加载，请刷新后重试', 'error');
+      return;
+    }
+
     this.submitting = true;
-
-    const form = e.target as HTMLFormElement;
-    const formData = new FormData(form);
-
-    const submitData = {
-      url: formData.get('url'),
-      displayName: formData.get('displayName'),
-      logo: formData.get('logo'),
-      description: formData.get('description'),
-      oldUrl: formData.get('oldUrl'),
-      email: formData.get('email'),
-      groupName: formData.get('groupName'),
-      rssUrl: formData.get('rssUrl'),
-      message: formData.get('message'),
-      type: formData.get('type'),
-    };
-
+    const form = event.currentTarget as HTMLFormElement;
     try {
-      const response = await fetch('/apis/api.link.submit.halo.run/v1alpha1/linksubmits/-/submit', {
+      const response = await fetch(OFFICIAL_APPLICATION_API, {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
-          Accept: 'application/json',
+          Accept: 'application/json, application/problem+json',
         },
-        credentials: 'same-origin',
-        body: JSON.stringify(submitData),
+        body: JSON.stringify(
+          createOfficialApplicationPayload(new FormData(form), this.captcha.challengeId)
+        ),
       });
-
-      const responseText = await response.text();
-      let result: unknown;
-      try {
-        result = responseText ? JSON.parse(responseText) : null;
-      } catch {
-        throw new Error('提交接口返回格式错误');
-      }
-
+      const result = await parseResponse<ApplicationResponse & ProblemResponse>(response);
       if (!response.ok) {
-        const errorResponse = result as ErrorResponse;
-        this.showToast(errorResponse.detail, 'error');
+        this.showToast(result?.detail || result?.title || '提交失败，请检查表单', 'error');
+        await this.fetchCaptcha();
         return;
       }
-
-      const successResponse = result as SuccessResponse;
-      if (successResponse.spec.status === 'review') {
-        this.showToast('提交成功，链接已审核');
-      } else {
-        this.showToast('提交成功，请等待审核');
-      }
-
-      // 延迟关闭表单，让用户看到提示
-      setTimeout(() => {
-        this.handleClose();
-      }, 1000);
+      this.showToast('申请已提交到官方友链审核，请等待处理');
+      form.reset();
+      this.captcha = undefined;
+      window.setTimeout(() => this.handleClose(), 1200);
     } catch (error) {
       this.showToast(error instanceof Error ? error.message : '提交失败，请稍后重试', 'error');
+      await this.fetchCaptcha();
     } finally {
       this.submitting = false;
     }
   }
 
-  private linkSubmitForm() {
+  private renderForm() {
     return html`
-      <div class="p-6 z-1 bg-base sticky top-0 border-form-border">
-        <div class="flex flex-row-reverse items-center justify-between">
-          <button
-            type="button"
-            tabindex="0"
-            aria-label="关闭"
-            class="text-xl text-form-label hover:text-form-text transition-colors"
-            @click=${this.handleClose}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="w-6 h-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-          <h2 id="link-submit-modal-title" class="text-xl font-semibold text-form-text">
-            提交网站
-          </h2>
+      <header class="modal-header">
+        <div>
+          <h2 id="link-submit-modal-title">申请友链</h2>
+          <p>申请将进入 Halo 官方链接插件审核，本插件仅提供表单与信息提取增强。</p>
         </div>
-        <div class="mt-6">
-          <form class="flex flex-col gap-6" @submit=${this.handleSubmit}>
-            <div class="grid grid-cols-2 gap-4">
-              <div class="flex flex-col gap-2">
-                <label for="input-type" class="form-label">类型</label>
-                <select
-                  id="input-type"
-                  name="type"
-                  required
-                  class="form-input"
-                  @change=${this.handleTypeChange}
-                >
-                  <option value="add">添加</option>
-                  <option value="update">修改</option>
-                </select>
-              </div>
-              <div class="flex flex-col gap-2">
-                <label for="input-group-name" class="form-label">网站分组</label>
-                <select
-                  id="input-group-name"
-                  name="groupName"
-                  required
-                  class="form-input"
-                  ?disabled=${this.loading}
-                >
-                  ${this.groups.map(
-                    (group) => html`
-                      <option value="${group.groupName}">${group.displayName}</option>
-                    `
-                  )}
-                </select>
-                ${
-                  this.loading
-                    ? html` <div class="text-sm text-form-placeholder">加载中...</div> `
-                    : ''
-                }
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div class="flex flex-col gap-2">
-                <label for="input-url" class="form-label">网址</label>
-                <div class="site-info-field">
-                  <input
-                    type="url"
-                    name="url"
-                    id="input-url"
-                    placeholder="https://"
-                    required
-                    class="form-input site-info-url-input"
-                  />
-                  ${
-                    this.sitePreviewEnabled
-                      ? html`
-                          <button
-                            type="button"
-                            class="form-button site-info-trigger"
-                            ?disabled=${this.fetchingSite}
-                            @click=${this.fetchSiteInfo}
-                          >
-                            ${this.fetchingSite ? '获取中...' : '获取信息'}
-                          </button>
-                        `
-                      : ''
-                  }
-                </div>
-                ${
-                  this.sitePreviewEnabled
-                    ? html`
-                        <div class="text-sm text-form-placeholder">
-                          填写网址后点击「获取信息」，自动填充标题、Logo 和描述
-                        </div>
-                      `
-                    : ''
-                }
-              </div>
-              <div class="flex flex-col gap-2">
-                <label for="input-name" class="form-label">网站标题</label>
-                <input type="text" name="displayName" id="input-name" required class="form-input" />
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div class="flex flex-col gap-2">
-                <label for="input-logo" class="form-label">logo</label>
-                <input
-                  type="url"
-                  name="logo"
-                  id="input-logo"
-                  class="form-input"
-                  placeholder="可选，留空将自动获取"
-                />
-              </div>
-              <div class="flex flex-col gap-2">
-                <label for="input-url-rss" class="form-label">RSS地址</label>
-                <input type="url" name="rssUrl" id="input-url-rss" class="form-input" />
-              </div>
-            </div>
-
-            <div class="flex flex-col gap-2">
-              <label for="textarea-description" class="form-label">网站描述</label>
-              <textarea
-                id="textarea-description"
-                name="description"
-                rows="2"
-                class="form-input"
-              ></textarea>
-            </div>
-
-            <div class="flex flex-col gap-2">
-              <label for="textarea-message" class="form-label">备注留言</label>
-              <textarea
-                id="textarea-message"
-                name="message"
-                rows="2"
-                class="form-input"
-                placeholder="可选，向站长说明你的友链意图"
-              ></textarea>
-            </div>
-
+        <button
+          type="button"
+          class="icon-button"
+          aria-label="关闭申请窗口"
+          @click=${this.handleClose}
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg>
+        </button>
+      </header>
+      <form @submit=${this.handleSubmit}>
+        <div class="field field-wide">
+          <label for="input-url">网站地址 <span>*</span></label>
+          <div class="url-row">
+            <input
+              id="input-url"
+              name="url"
+              type="url"
+              placeholder="https://example.com"
+              required
+            />
             ${
-              this.selectedType === 'update'
-                ? html`
-              <div class="flex flex-col gap-2">
-                <label for="textarea-old-url" class="form-label">旧的网址</label>
-                <input type="url" name="oldUrl" id="textarea-old-url" required class="form-input"></input>
-              </div>
-            `
+              this.sitePreviewEnabled
+                ? html`<button
+                    type="button"
+                    class="secondary-button"
+                    ?disabled=${this.fetchingSite}
+                    @click=${this.fetchSiteInfo}
+                  >
+                    ${this.fetchingSite ? '获取中...' : '获取信息'}
+                  </button>`
                 : ''
             }
-
-            <div>
-              <label for="input-email" class="form-label">邮箱</label>
-              <div class="flex items-end gap-4">
-                <input
-                  type="email"
-                  name="email"
-                  id="input-email"
-                  class="form-input"
-                  style="width: 50%;"
-                />
-                <button
-                  type="submit"
-                  class="form-button whitespace-nowrap ml-auto"
-                  ?disabled=${this.submitting}
-                >
-                  ${this.submitting ? '提交中...' : '提交'}
-                </button>
-              </div>
-              <div class="text-sm text-form-placeholder mt-1">用于接收审核结果通知</div>
-            </div>
-          </form>
+          </div>
+          <small>修改网址后可再次获取，已自动填入的标题、Logo 和描述会同步更新。</small>
         </div>
-      </div>
 
-      ${
-        this.toastMessage
-          ? html`
-              <div class="fixed top-4 right-4 z-50 animate-fade-in">
-                <div
-                  class="rounded-lg shadow-lg px-6 py-4 ${this.toastType === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}"
-                >
-                  <div
-                    class="${this.toastType === 'success' ? 'text-green-800' : 'text-red-800'} font-medium"
-                  >
-                    ${this.toastType === 'success' ? '成功' : '错误'}
-                  </div>
-                  <div
-                    class="${this.toastType === 'success' ? 'text-green-600' : 'text-red-600'} text-sm mt-1"
-                  >
-                    ${this.toastMessage}
-                  </div>
-                </div>
-              </div>
-            `
-          : ''
-      }
+        <div class="field-grid">
+          <div class="field">
+            <label for="input-name">网站名称 <span>*</span></label>
+            <input id="input-name" name="displayName" type="text" required />
+          </div>
+          <div class="field">
+            <label for="input-email">联系邮箱</label>
+            <input id="input-email" name="email" type="email" autocomplete="email" />
+          </div>
+          <div class="field">
+            <label for="input-logo">Logo 地址</label>
+            <input id="input-logo" name="logo" type="url" placeholder="https://..." />
+          </div>
+          <div class="field">
+            <label for="input-rss">RSS / Atom</label>
+            <input id="input-rss" name="rssUrl" type="url" placeholder="https://.../feed.xml" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="input-backlink">本站友链页面</label>
+          <input
+            id="input-backlink"
+            name="backlink"
+            type="url"
+            placeholder="已添加本站链接的页面地址"
+          />
+        </div>
+
+        <div class="field">
+          <label for="textarea-description">网站描述</label>
+          <textarea id="textarea-description" name="description" rows="3"></textarea>
+        </div>
+
+        <div class="captcha-row">
+          <div class="field captcha-input">
+            <label for="input-captcha">验证码 <span>*</span></label>
+            <input id="input-captcha" name="captchaCode" type="text" autocomplete="off" required />
+          </div>
+          <button
+            type="button"
+            class="captcha-image"
+            aria-label="刷新验证码"
+            ?disabled=${this.captchaLoading}
+            @click=${this.fetchCaptcha}
+          >
+            ${
+              this.captcha?.image
+                ? html`<img src=${this.captcha.image} alt="友链申请验证码" />`
+                : html`<span>${this.captchaLoading ? '加载中' : '点击刷新'}</span>`
+            }
+          </button>
+        </div>
+
+        <footer class="modal-footer">
+          <button type="button" class="secondary-button" @click=${this.handleClose}>取消</button>
+          <button
+            type="submit"
+            class="primary-button"
+            ?disabled=${this.submitting || this.captchaLoading || !this.captcha}
+          >
+            ${this.submitting ? '提交中...' : '提交申请'}
+          </button>
+        </footer>
+      </form>
     `;
   }
 
   override render() {
-    return html`<div
-      class="modal__wrapper"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="link-submit-modal-title"
-      style="${styleMap({ display: this.open ? 'flex' : 'none' })}"
-    >
-      <div class="modal__layer" @click="${this.handleClose}"></div>
-      <div data-overlayscrollbars-initialize class="modal__content shadow-xl bg-modal">
-        ${this.open ? this.linkSubmitForm() : ''}
+    const ariaHidden: 'true' | 'false' = this.open ? 'false' : 'true';
+    return html`
+      <div
+        class="modal-wrapper ${this.open ? 'is-open' : ''}"
+        aria-hidden=${ariaHidden}
+        @keydown=${this.handleKeydown}
+      >
+        <button
+          class="modal-layer"
+          type="button"
+          aria-label="关闭申请窗口"
+          @click=${this.handleClose}
+        ></button>
+        <section
+          class="modal-content"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="link-submit-modal-title"
+        >
+          ${this.open ? this.renderForm() : ''}
+        </section>
+        ${
+          this.toastMessage
+            ? html`<div
+                class="toast ${this.toastType}"
+                role=${this.toastType === 'error' ? 'alert' : 'status'}
+                aria-live="polite"
+              >
+                <strong>${this.toastType === 'error' ? '提交提示' : '操作成功'}</strong>
+                <span>${this.toastMessage}</span>
+              </div>`
+            : ''
+        }
       </div>
-    </div>`;
+    `;
   }
 
-  static override styles = [
-    unsafeCSS(resetStyles),
-    unsafeCSS(overlayscrollbarsStyles),
-    baseStyles,
-    css`
-      :host {
-        // @deprecated --link-submit-widget-color-modal-layer and
-        // --link-submit-widget-base-border-radius will be removed in future
-        --base-rounded: var(
-          --link-submit-widget-base-rounded,
-          var(--link-submit-widget-base-border-radius, 0.4em)
-        );
-        --modal-layer-color: var(--link-submit-widget-modal-layer-color);
+  static override styles = css`
+    :host {
+      --accent: var(--link-submit-widget-form-button-bg-color, #d13e43);
+      --accent-hover: var(--link-submit-widget-form-button-hover-bg-color, #b92f35);
+      --surface: var(--link-submit-widget-base-bg-color, #ffffff);
+      --surface-muted: color-mix(in srgb, var(--surface) 94%, #64748b);
+      --text: var(--link-submit-widget-form-text-color, #18202b);
+      --text-muted: var(--link-submit-widget-form-label-color, #5d6878);
+      --border: var(--link-submit-widget-form-border-color, #d9dee7);
+      --radius: var(--link-submit-widget-base-rounded, 8px);
+      font:
+        400 16px/1.55 ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        'Segoe UI',
+        sans-serif;
+      color: var(--text);
+    }
+    * {
+      box-sizing: border-box;
+    }
+    button,
+    input,
+    textarea {
+      font: inherit;
+      letter-spacing: 0;
+    }
+    .modal-wrapper {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .modal-wrapper.is-open {
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .modal-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: var(--link-submit-widget-modal-layer-color, rgb(15 23 42 / 0.64));
+      opacity: 0;
+      transition: opacity 180ms ease;
+    }
+    .is-open .modal-layer {
+      opacity: 1;
+    }
+    .modal-content {
+      position: relative;
+      width: min(680px, 100%);
+      max-height: min(820px, calc(100vh - 48px));
+      overflow: auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 24px 70px rgb(15 23 42 / 0.24);
+      opacity: 0;
+      translate: 0 12px;
+      transition:
+        opacity 180ms ease,
+        translate 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .is-open .modal-content {
+      opacity: 1;
+      translate: 0 0;
+    }
+    .modal-header {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 24px 28px 18px;
+      background: color-mix(in srgb, var(--surface) 94%, transparent);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+    }
+    h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      line-height: 1.3;
+    }
+    .modal-header p {
+      margin: 6px 0 0;
+      max-width: 520px;
+      color: var(--text-muted);
+      font-size: 0.86rem;
+    }
+    .icon-button {
+      flex: 0 0 40px;
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .icon-button:hover {
+      background: var(--surface-muted);
+      color: var(--text);
+    }
+    .icon-button svg {
+      width: 21px;
+      height: 21px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+    }
+    form {
+      display: grid;
+      gap: 20px;
+      padding: 24px 28px 28px;
+    }
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .field {
+      display: grid;
+      gap: 7px;
+      min-width: 0;
+    }
+    label {
+      color: var(--text);
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    label span {
+      color: var(--accent);
+    }
+    small {
+      color: var(--text-muted);
+      font-size: 0.78rem;
+    }
+    input,
+    textarea {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) - 2px);
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+      transition:
+        border-color 150ms ease,
+        box-shadow 150ms ease;
+    }
+    input {
+      min-height: 44px;
+      padding: 0 12px;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 88px;
+      padding: 10px 12px;
+    }
+    input:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+    }
+    .url-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+    }
+    .captcha-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 180px;
+      gap: 14px;
+      align-items: end;
+    }
+    .captcha-image {
+      min-height: 72px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      padding: 4px;
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) - 2px);
+      background: var(--surface-muted);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .captcha-image img {
+      display: block;
+      width: 100%;
+      height: 62px;
+      object-fit: contain;
+    }
+    .primary-button,
+    .secondary-button {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 18px;
+      border-radius: calc(var(--radius) - 2px);
+      font-weight: 600;
+      cursor: pointer;
+      transition:
+        background-color 150ms ease,
+        border-color 150ms ease,
+        color 150ms ease,
+        transform 100ms ease;
+    }
+    .primary-button {
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+    .primary-button:hover:not(:disabled) {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+    .secondary-button {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+    }
+    .secondary-button:hover:not(:disabled) {
+      border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+      color: var(--accent);
+    }
+    button:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding-top: 4px;
+    }
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 3;
+      width: min(360px, calc(100vw - 40px));
+      display: grid;
+      gap: 3px;
+      padding: 14px 16px;
+      border: 1px solid #a7d7bd;
+      border-radius: var(--radius);
+      background: #effaf4;
+      color: #14532d;
+      box-shadow: 0 14px 36px rgb(15 23 42 / 0.18);
+    }
+    .toast.error {
+      border-color: #efb0b0;
+      background: #fff1f1;
+      color: #8a1c1c;
+    }
+    .toast span {
+      font-size: 0.84rem;
+    }
+    @media (max-width: 620px) {
+      .modal-wrapper {
+        align-items: end;
+        padding: 0;
       }
-
-      .modal__wrapper {
-        position: fixed;
-        left: 0px;
-        top: 0px;
-        display: flex;
-        height: 100%;
+      .modal-content {
         width: 100%;
-        flex-direction: row;
-        align-items: flex-start;
-        justify-content: center;
-        padding-top: 3em;
-        padding-bottom: 3em;
-        z-index: 999;
+        max-height: calc(100dvh - 12px);
+        border-radius: var(--radius) var(--radius) 0 0;
       }
-
-      .modal__layer {
-        background-color: var(--modal-layer-color, rgb(107 114 128 / 0.75));
-        position: absolute;
-        top: 0px;
-        left: 0px;
-        height: 100%;
-        width: 100%;
-        flex: none;
-        animation: fadeIn 0.15s both;
-        backdrop-filter: blur(4px);
+      .modal-header {
+        padding: 20px 18px 15px;
       }
-
-      .modal__content {
-        border-radius: var(--base-rounded, 0.4em);
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        width: calc(100vw - 20px);
-        max-height: calc(100vh - 5em);
-        max-width: 580px;
-        overflow: auto;
-        animation: fadeInUp 0.3s both;
+      form {
+        padding: 20px 18px 24px;
       }
-
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-        }
-
-        to {
-          opacity: 1;
-        }
+      .field-grid,
+      .captcha-row,
+      .url-row {
+        grid-template-columns: minmax(0, 1fr);
       }
-
-      @keyframes fadeInUp {
-        from {
-          opacity: 0;
-          transform: translate3d(0, 10%, 0);
-        }
-
-        to {
-          opacity: 1;
-          transform: translate3d(0, 0, 0);
-        }
+      .captcha-image {
+        min-height: 68px;
       }
-
-      .site-info-field {
-        display: flex;
-        min-width: 0;
-        align-items: stretch;
-        gap: 0.5rem;
+      .modal-footer {
+        position: sticky;
+        bottom: 0;
+        margin: 0 -18px -24px;
+        padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
+        background: var(--surface);
+        border-top: 1px solid var(--border);
       }
-
-      .site-info-url-input {
-        flex: 1 1 auto;
-        min-width: 0;
+      .modal-footer button {
+        flex: 1;
       }
-
-      .site-info-trigger {
-        flex: 0 0 auto;
-        box-sizing: border-box;
-        min-height: 50px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0 1rem;
-        white-space: nowrap;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
       }
-
-      @media (max-width: 560px) {
-        .site-info-field {
-          flex-direction: column;
-        }
-
-        .site-info-trigger {
-          width: 100%;
-        }
-      }
-
-      @unocss-placeholder;
-    `,
-  ];
+    }
+  `;
 }
 
 customElements.get('link-submit-modal') ||
