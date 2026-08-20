@@ -14,18 +14,18 @@ public interface SettingConfigLinkSubmit {
         // basic group
         private boolean loadPlugInResources;
         private boolean displayTheSubmitButton;
+        private boolean enableLinkPreview;
+
+        // Legacy compatibility only. The enhancement plugin no longer consumes these settings.
         private boolean autoAudit;
         private int dailySubmitLimit;
         private boolean enableHealthCheck;
-        private boolean enableLinkPreview;
-
-        // notification group
+        private boolean enableAdminNotification;
+        private String adminUsername = "";
         private boolean sendEmail;
-        private String adminEmail;
-
-        // link group
-        private String groupName;
-        private List<String> forbidSelectedGroupName;
+        private String adminEmail = "";
+        private String groupName = "";
+        private List<String> forbidSelectedGroupName = List.of();
     }
 
     @Data
@@ -33,23 +33,6 @@ public interface SettingConfigLinkSubmit {
         public static final String GROUP = "basic";
         private boolean loadPlugInResources = true;
         private boolean displayTheSubmitButton = true;
-        private boolean autoAudit;
-        private int dailySubmitLimit;
-        private boolean enableHealthCheck = true;
         private boolean enableLinkPreview = true;
-    }
-
-    @Data
-    class NotificationGroupConfig {
-        public static final String GROUP = "notification";
-        private boolean sendEmail;
-        private String adminEmail = "";
-    }
-
-    @Data
-    class LinkGroupConfig {
-        public static final String GROUP = "link";
-        private String groupName = "";
-        private List<String> forbidSelectedGroupName = List.of();
     }
 }

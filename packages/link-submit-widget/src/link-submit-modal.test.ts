@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { LinkSubmitModal } from './link-submit-modal';
+import { LinkSubmitModal, createOfficialApplicationPayload } from './link-submit-modal';
 
 interface ConfigurationTestModal {
   fetchConfiguration: () => Promise<void>;
@@ -57,7 +57,7 @@ describe('LinkSubmitModal configuration', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ linkPreviewEnabled: false }),
+        text: async () => JSON.stringify({ linkPreviewEnabled: false }),
       })
     );
     const modal = createModalForConfigurationTest();
@@ -111,5 +111,46 @@ describe('LinkSubmitModal site information', () => {
     expect(fields['#input-name'].value).toBe('');
     expect(fields['#input-logo'].value).toBe('');
     expect(fields['#textarea-description'].value).toBe('');
+  });
+});
+
+describe('official PluginLinks application payload', () => {
+  it('maps enhancement fields to the official application contract', () => {
+    const form = new FormData();
+    form.set('url', ' https://example.com ');
+    form.set('displayName', ' Example ');
+    form.set('logo', 'https://example.com/logo.png');
+    form.set('description', ' Description ');
+    form.set('email', 'owner@example.com');
+    form.set('backlink', 'https://example.com/links');
+    form.set('rssUrl', 'https://example.com/feed.xml');
+    form.set('captchaCode', ' ab12 ');
+
+    expect(createOfficialApplicationPayload(form, 'challenge-1')).toEqual({
+      url: 'https://example.com',
+      displayName: 'Example',
+      logo: 'https://example.com/logo.png',
+      description: 'Description',
+      email: 'owner@example.com',
+      backlink: 'https://example.com/links',
+      feedUrls: ['https://example.com/feed.xml'],
+      challengeId: 'challenge-1',
+      captchaCode: 'ab12',
+    });
+  });
+
+  it('uses null and an empty feed list for optional blank fields', () => {
+    const form = new FormData();
+    form.set('url', 'https://example.com');
+    form.set('displayName', 'Example');
+    form.set('captchaCode', 'ABCD');
+
+    expect(createOfficialApplicationPayload(form, 'challenge-2')).toMatchObject({
+      logo: null,
+      description: null,
+      email: null,
+      backlink: null,
+      feedUrls: [],
+    });
   });
 });

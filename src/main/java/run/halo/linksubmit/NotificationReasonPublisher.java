@@ -10,7 +10,6 @@ import lombok.experimental.UtilityClass;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 import run.halo.app.core.extension.notification.Reason;
 import run.halo.app.extension.ExtensionClient;
@@ -26,7 +25,7 @@ import static run.halo.linksubmit.Constant.REVIEW_LINK_SUBMIT;
 import static run.halo.linksubmit.Constant.USER_LINK_SUBMIT;
 import static run.halo.linksubmit.extension.LinkSubmit.REVIEW_DESCRIPTION;
 
-@Component
+@Deprecated(forRemoval = true)
 @RequiredArgsConstructor
 public class NotificationReasonPublisher {
 
@@ -46,11 +45,17 @@ public class NotificationReasonPublisher {
     public void onPostPublished(LinkSubmitEvent event) {
         LinkSubmit linkSubmit = event.getLinkSubmit();
         var basicConfig = settingConfigLinkSubmit.getBasicConfig().blockOptional();
-        if (basicConfig.isEmpty() || !basicConfig.get().isSendEmail()) {
+        if (basicConfig.isEmpty()) {
             return;
         }
-        if (StringUtils.isNotEmpty(basicConfig.get().getAdminEmail())) {
-            adminLinkSubmitNoticeReasonPublisher.publishReasonBy(linkSubmit, basicConfig.get().getAdminEmail());
+        var config = basicConfig.get();
+        boolean notifyAdmin = config.isEnableAdminNotification()
+            && StringUtils.isNotBlank(config.getAdminUsername());
+        boolean emailAdmin = config.isSendEmail() && StringUtils.isNotBlank(config.getAdminEmail());
+        if (notifyAdmin || emailAdmin) {
+            adminLinkSubmitNoticeReasonPublisher.publishReasonBy(linkSubmit,
+                StringUtils.defaultString(config.getAdminUsername()),
+                StringUtils.defaultString(config.getAdminEmail()));
         }
         var spec = linkSubmit.getSpec();
         if (spec == null) {
@@ -58,7 +63,8 @@ public class NotificationReasonPublisher {
         }
         var status = spec.getStatus();
         String email = spec.getEmail();
-        if (StringUtils.isNotEmpty(email) && status == LinkSubmit.ReviewStatus.pending) {
+        if (config.isSendEmail() && StringUtils.isNotEmpty(email)
+            && status == LinkSubmit.ReviewStatus.pending) {
             userLinkSubmitNoticeReasonPublisher.publishReasonBy(linkSubmit, email);
         }
     }
@@ -100,7 +106,7 @@ public class NotificationReasonPublisher {
         return status + ":" + Integer.toHexString(description.hashCode());
     }
 
-    @Component
+    @Deprecated(forRemoval = true)
     @RequiredArgsConstructor
     static class AdminLinkSubmitNoticeReasonPublisher {
         private final NotificationReasonEmitter notificationReasonEmitter;
@@ -108,7 +114,7 @@ public class NotificationReasonPublisher {
         private final ExternalLinkProcessor externalLinkProcessor;
 
 
-        public void publishReasonBy(LinkSubmit linkSubmit, String adminEmail) {
+        public void publishReasonBy(LinkSubmit linkSubmit, String adminUsername, String adminEmail) {
             String url = externalLinkProcessor.processLink("/console/tools/link-submit-next");
             var spec = linkSubmit.getSpec();
             var reasonSubject = Reason.Subject.builder()
@@ -121,6 +127,7 @@ public class NotificationReasonPublisher {
             notificationReasonEmitter.emit(ADMIN_LINK_SUBMIT,
                 builder -> {
                     var attributes = ReasonData.builder()
+                        .adminUsername(adminUsername)
                         .adminEmail(adminEmail)
                         .email(spec.getEmail())
                         .displayName(spec.getDisplayName())
@@ -138,21 +145,20 @@ public class NotificationReasonPublisher {
                         .reviewUrl(url)
                         .build();
                     builder.attributes(ReasonDataConverter.toAttributeMap(attributes))
-                        .author(UserIdentity.anonymousWithEmail(adminEmail))
                         .subject(reasonSubject);
                 }).block();
         }
 
 
         @Builder
-        record ReasonData(String adminEmail, String email, String displayName, String url, String description,
+        record ReasonData(String adminUsername, String adminEmail, String email, String displayName, String url, String description,
                           String logo, String oldUrl, String groupName, String rssUrl, String message,
                           String submittedAt, String type, Boolean review, String reviewUrl) {
         }
     }
 
 
-    @Component
+    @Deprecated(forRemoval = true)
     @RequiredArgsConstructor
     static class UserLinkSubmitNoticeReasonPublisher {
         private final NotificationReasonEmitter notificationReasonEmitter;
@@ -193,7 +199,7 @@ public class NotificationReasonPublisher {
         }
     }
 
-    @Component
+    @Deprecated(forRemoval = true)
     @RequiredArgsConstructor
     static class ReviewLinkSubmitNoticeReasonPublisher {
         private final NotificationReasonEmitter notificationReasonEmitter;

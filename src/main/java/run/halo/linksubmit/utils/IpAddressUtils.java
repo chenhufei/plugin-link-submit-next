@@ -1,8 +1,9 @@
 package run.halo.linksubmit.utils;
 
 import lombok.extern.slf4j.Slf4j;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.server.ServerRequest;
 
 /**
@@ -36,20 +37,47 @@ public class IpAddressUtils {
      * @return IP address if found, otherwise {@link #UNKNOWN}.
      */
     public static String getClientIp(ServerHttpRequest request) {
-        for (String header : IP_HEADER_NAMES) {
-            String ipList = request.getHeaders().getFirst(header);
-            if (StringUtils.hasText(ipList) && !UNKNOWN.equalsIgnoreCase(ipList)) {
-                String[] ips = ipList.trim().split("[,;]");
-                for (String ip : ips) {
-                    if (StringUtils.hasText(ip) && !UNKNOWN.equalsIgnoreCase(ip)) {
-                        return ip;
+        var remoteAddress = request.getRemoteAddress();
+        if (remoteAddress != null && !remoteAddress.isUnresolved()
+            && remoteAddress.getAddress() != null) {
+            if (isTrustedProxy(remoteAddress)) {
+                for (String header : IP_HEADER_NAMES) {
+                    String forwarded = firstForwardedIp(request.getHeaders().getFirst(header));
+                    if (forwarded != null) {
+                        return forwarded;
                     }
                 }
             }
+            return remoteAddress.getAddress().getHostAddress();
         }
-        var remoteAddress = request.getRemoteAddress();
-        return remoteAddress == null || remoteAddress.isUnresolved()
-            ? UNKNOWN : remoteAddress.getAddress().getHostAddress();
+        return UNKNOWN;
+    }
+
+    private static boolean isTrustedProxy(InetSocketAddress remoteAddress) {
+        InetAddress address = remoteAddress.getAddress();
+        return address.isAnyLocalAddress() || address.isLoopbackAddress()
+            || address.isLinkLocalAddress() || address.isSiteLocalAddress()
+            || (address.getAddress().length == 16 && (address.getAddress()[0] & 0xfe) == 0xfc);
+    }
+
+    private static String firstForwardedIp(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String candidate = value.split(",", 2)[0].trim();
+        if (!isIpLiteral(candidate)) {
+            return null;
+        }
+        try {
+            return InetAddress.getByName(candidate).getHostAddress();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static boolean isIpLiteral(String value) {
+        return value.matches("(?:\\d{1,3}\\.){3}\\d{1,3}|[0-9a-fA-F:]+")
+            && !value.contains(" ");
     }
 
 

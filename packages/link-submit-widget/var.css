@@ -15,6 +15,47 @@
   --link-submit-widget-form-button-hover-bg-color: #1f2937;
 }
 
+/* The optional floating trigger is emitted by the plugin footer processor. */
+.link-submit-widget-trigger {
+  position: fixed;
+  right: 2rem;
+  bottom: 6rem;
+  z-index: 999;
+  display: flex;
+  width: 3rem;
+  height: 3rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(209 62 67 / 0.9);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+  transition: background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.link-submit-widget-trigger:hover {
+  background: rgb(209 62 67);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.24);
+  transform: translateY(-1px);
+}
+
+.link-submit-widget-trigger:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+.link-submit-widget-trigger:active {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .link-submit-widget-trigger {
+    transition: none;
+  }
+}
+
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
   .color-scheme-auto,
