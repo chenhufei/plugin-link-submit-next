@@ -6,6 +6,7 @@
     "dev": "rsbuild build --watch --env-mode=development",
     "lint:oxlint": "oxlint . --fix -D correctness --ignore-path .gitignore",
     "lint:eslint": "eslint . --fix",
+    "lint:check": "eslint . --max-warnings=0",
     "lint": "run-s lint:*",
     "prettier": "prettier --write src/",
     "test:unit": "vitest --passWithNoTests",

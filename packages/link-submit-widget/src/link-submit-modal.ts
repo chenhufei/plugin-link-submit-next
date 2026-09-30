@@ -75,6 +75,7 @@ export class LinkSubmitModal extends LitElement {
   private toastTimer?: number;
   private captchaExpiryTimer?: number;
   private previousBodyOverflow = '';
+  private focusOrigin: HTMLElement | null = null;
   private lastFetchedSiteInfo = { title: '', logo: '', description: '' };
 
   constructor() {
@@ -85,11 +86,18 @@ export class LinkSubmitModal extends LitElement {
   override willUpdate(changedProperties: PropertyValues) {
     if (!changedProperties.has('open')) return;
     if (this.open) {
+      const activeElement = document.activeElement;
+      this.focusOrigin = activeElement instanceof HTMLElement ? activeElement : null;
       this.previousBodyOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       if (!this.captcha) void this.fetchCaptcha();
     } else {
       document.body.style.overflow = this.previousBodyOverflow;
+      const focusOrigin = this.focusOrigin;
+      this.focusOrigin = null;
+      if (focusOrigin?.isConnected) {
+        requestAnimationFrame(() => focusOrigin.focus());
+      }
     }
   }
 
@@ -249,6 +257,27 @@ export class LinkSubmitModal extends LitElement {
     if (event.key === 'Escape') {
       event.preventDefault();
       this.handleClose();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+
+    const modalContent = this.shadowRoot?.querySelector<HTMLElement>('.modal-content');
+    const focusable = Array.from(
+      modalContent?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href]'
+      ) ?? []
+    ).filter((element) => !element.hidden && element.getAttribute('aria-hidden') !== 'true');
+    if (!focusable.length) return;
+
+    const activeElement = this.shadowRoot?.activeElement as HTMLElement | null;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && activeElement === last) {
+      event.preventDefault();
+      first.focus();
     }
   }
 

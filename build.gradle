@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'run.halo.linksubmit'
-version '1.2.5'
+version '1.2.8'
 
 repositories {
     mavenCentral()
@@ -15,7 +15,7 @@ repositories {
 }
 
 dependencies {
-    implementation platform('run.halo.tools.platform:plugin:2.25.0')
+    implementation platform('run.halo.tools.platform:plugin:2.26.0')
     compileOnly 'run.halo.app:api'
 
     testImplementation 'run.halo.app:api'
@@ -51,7 +51,7 @@ tasks.named('classes') {
 }
 
 halo {
-    version = '2.25.0'
+    version = '2.26.0'
 }
 
 tasks.register('verifyVersionConsistency') {
@@ -59,10 +59,20 @@ tasks.register('verifyVersionConsistency') {
     description = 'Verify plugin.yaml version matches the Gradle project version.'
     inputs.files(
         layout.projectDirectory.file('src/main/resources/plugin.yaml'),
-        layout.projectDirectory.file('packages/link-submit-widget/package.json')
+        layout.projectDirectory.file('packages/link-submit-widget/package.json'),
+        layout.projectDirectory.file('gradle.properties')
     )
     doLast {
         def expectedVersion = project.version.toString()
+        def gradleProperties = layout.projectDirectory.file('gradle.properties').asFile
+            .readLines('UTF-8')
+            .find { it.trim().startsWith('version=') }
+        def propertiesVersion = gradleProperties?.substring(gradleProperties.indexOf('=') + 1)?.trim()
+        if (propertiesVersion != expectedVersion) {
+            throw new GradleException(
+                "Version mismatch: Gradle=${expectedVersion}, gradle.properties=${propertiesVersion}"
+            )
+        }
         def pluginYaml = layout.projectDirectory
             .file('src/main/resources/plugin.yaml').asFile.getText('UTF-8')
         def versionMatcher = pluginYaml =~ /(?m)^\s{2}version:\s*["']?([^"'\s]+)["']?\s*$/
@@ -99,6 +109,9 @@ tasks.register('verifyPublicationMetadata') {
             .file('src/main/resources/plugin.yaml').asFile.getText('UTF-8')
         if (pluginYaml =~ /store\.halo\.run\/app-id:\s*["']?app-(?:link-submit-next|TODO|CHANGE_ME)["']?/) {
             throw new GradleException('Plugin metadata contains a placeholder or upstream store app id.')
+        }
+        if (!(pluginYaml =~ /(?m)^\s{2}enabled:\s*true\s*$/)) {
+            throw new GradleException('Enhancement plugin must be enabled by default after installation.')
         }
         def widgetPackage = new groovy.json.JsonSlurper().parse(
             layout.projectDirectory.file('packages/link-submit-widget/package.json').asFile
@@ -174,6 +187,9 @@ tasks.register('verifyEnhancementBoundary') {
         if (!pluginYaml.contains('"PluginLinks": ">=2.3.0"')) {
             throw new GradleException('PluginLinks dependency must require the verified 2.3.0 API')
         }
+        if (!pluginYaml.contains('requires: ">=2.26.0"')) {
+            throw new GradleException('PluginLinks 2.3.0 requires Halo 2.26 or newer')
+        }
         def widgetEntry = layout.projectDirectory
             .file('packages/link-submit-widget/src/index.ts').asFile.getText('UTF-8')
         ['data-link-application-enabled', 'isOfficialApplicationEnabled', 'trigger.hidden = true']
@@ -212,6 +228,7 @@ tasks.named('check') {
     dependsOn('verifyEnhancementBoundary')
     dependsOn('verifyWidgetRuntimeAsset')
     dependsOn project(':packages:link-submit-widget').tasks.named('testFrontend')
+    dependsOn project(':packages:link-submit-widget').tasks.named('lintFrontend')
 }
 
 haloPlugin {

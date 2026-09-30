@@ -16,12 +16,15 @@ import org.jsoup.nodes.Element;
 import org.springdoc.webflux.core.fn.SpringdocRouteBuilder;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import reactor.netty.http.client.HttpClient;
 import run.halo.app.core.extension.endpoint.CustomEndpoint;
 import run.halo.app.extension.GroupVersion;
 
@@ -230,26 +233,17 @@ public class AnonymousEndpoint implements CustomEndpoint {
     }
 
     private static FetchResult fetchDocument(String initialUrl) throws Exception {
-        String current = initialUrl;
+        java.net.URI current = java.net.URI.create(initialUrl);
         for (int redirect = 0; redirect < 4; redirect++) {
-            SafeUrlValidator.requirePublicHttpUrl(current);
-            var response = Jsoup.connect(current)
-                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-                .header("Accept", "text/html,application/xhtml+xml;q=0.9")
-                .timeout(8000)
-                .maxBodySize(SITE_INFO_MAX_BODY_BYTES)
-                .followRedirects(false)
-                .ignoreHttpErrors(true)
-                .execute();
-            int status = response.statusCode();
+            var validatedUrl = SafeUrlValidator.validatePublicHttpUrl(current.toString());
+            var response = fetchPinned(validatedUrl);
+            int status = response.status();
             if (status >= 300 && status < 400) {
-                String location = response.header("Location");
+                String location = response.location();
                 if (location == null || location.isBlank()) {
                     throw new IllegalArgumentException("目标网站重定向地址为空");
                 }
-                current = SafeUrlValidator.requirePublicHttpUrl(
-                    java.net.URI.create(current).resolve(location).toString()).toString();
+                current = validatedUrl.uri().resolve(location);
                 continue;
             }
             if (status < 200 || status >= 400) {
@@ -263,9 +257,43 @@ public class AnonymousEndpoint implements CustomEndpoint {
                 && !normalizedContentType.startsWith("application/xhtml+xml")) {
                 throw new IllegalArgumentException("目标网站不是 HTML 页面");
             }
-            return new FetchResult(response.parse());
+            return new FetchResult(Jsoup.parse(response.body(), validatedUrl.uri().toString()));
         }
         throw new IllegalArgumentException("目标网站重定向次数过多");
+    }
+
+    private static PinnedHttpResponse fetchPinned(SafeUrlValidator.ValidatedUrl validatedUrl) {
+        var resolver = SafeUrlValidator.pinnedResolver(validatedUrl);
+        try {
+            var httpClient = HttpClient.newConnection()
+                .resolver(resolver)
+                .followRedirect(false)
+                .compress(true)
+                .responseTimeout(Duration.ofSeconds(8));
+            var webClient = WebClient.builder()
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .codecs(configurer -> configurer.defaultCodecs()
+                    .maxInMemorySize(SITE_INFO_MAX_BODY_BYTES))
+                .build();
+            return webClient.get()
+                .uri(validatedUrl.uri())
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+                .accept(MediaType.TEXT_HTML, MediaType.valueOf("application/xhtml+xml"))
+                .exchangeToMono(response -> response.bodyToMono(String.class)
+                    .defaultIfEmpty("")
+                    .map(body -> new PinnedHttpResponse(
+                        response.statusCode().value(),
+                        response.headers().asHttpHeaders().getFirst("Location"),
+                        response.headers().contentType().map(MediaType::toString).orElse(""),
+                        body)))
+                .block(Duration.ofSeconds(10));
+        } finally {
+            resolver.close();
+        }
+    }
+
+    private record PinnedHttpResponse(int status, String location, String contentType, String body) {
     }
 
     private record FetchResult(Document doc) {
