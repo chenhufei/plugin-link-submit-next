@@ -3,8 +3,9 @@ plugins {
 }
 
 node {
-    download = true
-    version = '24.14.0'
+    // Reuse the Node.js installation configured by the developer or CI.
+    download = false
+    version = '24.15.0'
     pnpmVersion = '10.22.0'
 }
 
@@ -37,4 +38,13 @@ tasks.register('testFrontend', PnpmTask) {
     pnpmCommand = ['run', 'test:ci']
     inputs.dir('src')
     inputs.files('package.json', 'vitest.config.ts', 'vite.config.lib.ts')
+}
+
+tasks.register('lintFrontend', PnpmTask) {
+    group = 'verification'
+    description = 'Run the Widget lint check without modifying source files.'
+    pnpmCommand = ['run', 'lint:check']
+    dependsOn tasks.named('installDepsForWidget')
+    inputs.dir(layout.projectDirectory.dir('src'))
+    inputs.files('package.json', '.eslintrc.json', '.prettierrc.json')
 }

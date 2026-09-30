@@ -14,8 +14,3 @@ declare module "axios" {
   }
 }
 
-declare module "vue" {
-  interface ComponentCustomProperties {
-    $formkit: any;
-  }
-}

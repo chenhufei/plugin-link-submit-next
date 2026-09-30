@@ -1,6 +1,6 @@
 {
     "name": "@chenhufei/link-submit-next-widget",
-    "version": "1.2.5",
+    "version": "1.2.8",
     "description": "Halo 官方 PluginLinks 的友链自助提交增强 Widget",
     "license": "GPL-3.0-only",
     "homepage": "https://github.com/chenhufei/plugin-link-submit-next",
@@ -45,6 +45,7 @@
         "dev": "vite --config vite.config.dev.ts",
         "build": "vite build --config vite.config.lib.ts",
         "lint": "lit-analyzer --rules.no-invalid-css off && eslint \"src/**/*.ts\"",
+        "lint:check": "lit-analyzer --rules.no-invalid-css off && eslint \"src/**/*.ts\" --max-warnings=0",
         "prettier": "prettier \"**/*.{cjs,html,js,json,md,ts}\" --ignore-path ./.gitignore --write",
         "test": "vitest",
         "test:ci": "vitest --run"

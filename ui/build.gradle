@@ -6,8 +6,10 @@ plugins {
 group 'run.halo.linksubmit.ui'
 
 node {
-    download = true
-    version = '24.14.0'
+    // Use the Node.js installation supplied by the developer/CI setup.
+    // Downloading a second archive makes local builds fail on constrained disks.
+    download = false
+    version = '24.15.0'
     pnpmVersion = '10.22.0'
 }
 
@@ -26,6 +28,21 @@ tasks.register('buildFrontend', PnpmTask) {
         dir: layout.projectDirectory,
         includes: ['*.cjs', '*.ts', '*.js', '*.json', '*.yaml']))
     outputs.dir(layout.buildDirectory.dir('dist'))
+}
+
+tasks.register('lintFrontend', PnpmTask) {
+    group = 'verification'
+    description = 'Run the UI lint check without modifying source files.'
+    pnpmCommand = ['run', 'lint:check']
+    dependsOn tasks.named('installDepsForUI')
+    inputs.dir(layout.projectDirectory.dir('src'))
+    inputs.files(fileTree(
+        dir: layout.projectDirectory,
+        includes: ['*.ts', '*.json', '*.yaml']))
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('lintFrontend')
 }
 
 tasks.named('assemble') {

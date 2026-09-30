@@ -3,11 +3,11 @@ kind: Plugin
 metadata:
   name: link-submit-next
 spec:
-  enabled: false
-  requires: ">=2.25.0"
+  enabled: true
+  requires: ">=2.26.0"
   pluginDependencies:
     "PluginLinks": ">=2.3.0"
-  version: "1.2.5"
+  version: "1.2.8"
   author:
     name: chenhufei
     website: https://github.com/chenhufei
