@@ -7,7 +7,11 @@
 - `site-info` 解析顺序对齐官方后台 `link.detail`：`<title>` / `meta[name=description]` / `link[rel~=icon]` 优先，`og:*` 仅在标准标签缺失时兜底；Logo 不再优先取 `og:image`。
 
 ### Verification
-- 组件单测 14 项通过；主题契约检查与完整包构建结果见交付说明。
+- Widget 单测 14 项通过（`vitest --run`，`src/site-info.test.ts`）；Widget `eslint "src/**/*.ts" --max-warnings=0` 零告警。
+- Java 单测 10 项通过（`cleanTest test`：`AnonymousEndpointRateLimitTest`、`IpAddressUtilsTest`、`SafeUrlValidatorTest`，0 失败 / 0 错误 / 0 跳过）。
+- Console UI `eslint . --max-warnings=0` 零告警。
+- Gradle 校验任务全部通过：`verifyVersionConsistency`（Gradle / `plugin.yaml` / `gradle.properties` / Widget 包版本一致）、`verifyPublicationMetadata`（Halo `>= 2.27.0`、`PluginLinks` 2.x 依赖区间）、`verifyEnhancementBoundary`（不含 `LinkSubmit` 模型、`linksubmits`、`link-applications` 等旧边界）、`verifyWidgetRuntimeAsset`（运行时脚本契约）。
+- 完整安装包已构建并抽查：`link-submit-next-2.0.1.jar` 含 `plugin.yaml`（`version: 2.0.1`、`requires: ">=2.27.0"`）、`static/link-apply-enhance.iife.js`、`ui/ui-plugin.json`。
 
 ## [2.0.0] - 2026-10-29
 
