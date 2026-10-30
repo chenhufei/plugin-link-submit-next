@@ -1,5 +1,24 @@
 # 更新日志
 
+## [2.0.2] - 2026-10-31
+
+### Security
+- **限流 key 可伪造**：`X-Forwarded-For` 原本取最左值，而这个值由客户端自带、可写成任意 IP，等于把
+  `site-info` 的限流关掉。改为取最右一跳（可信代理亲眼看到的对端地址）。
+- **事件循环被 DNS 阻塞**：`firstForwardedIp` 会先放行形似十六进制的任意字符串，再交给
+  `InetAddress.getByName` 解析，`X-Forwarded-For: beef` 因此进入域名解析；该调用同步运行在 Netty
+  事件循环上，几十个并发就能拖住全站接口。现在改为纯字面量解析，完全不做 DNS 查询。
+- **端口未限制**：URL 校验原本不限端口，匿名接口可用于探测 6379(Redis)、25(SMTP)、9200(ES) 等
+  非 HTTP 服务是否存活。现在只放行 80 与 443。
+- **SSRF 探测 oracle**：400 响应不再回显异常原文（内网地址被拒 / 主机无法解析 / 端口不允许），
+  具体原因只写服务端日志。
+
+### Verification
+- Java 单测 15 项通过（`cleanTest test`：`AnonymousEndpointRateLimitTest`、`IpAddressUtilsTest`、`SafeUrlValidatorTest`，0 失败 / 0 错误 / 0 跳过）；新增用例覆盖「取最右一跳」「非字面量不做解析」「IPv4 越界回落」「非 Web 端口拒绝」。
+- Widget 构建通过（`vite build --config vite.config.lib.ts`：`link-apply-enhance.iife.js` 4.85 kB）。
+- Gradle 校验任务全部通过：`verifyVersionConsistency`（Gradle / `plugin.yaml` / `gradle.properties` / Widget 包版本一致）、`verifyPublicationMetadata`、`verifyEnhancementBoundary`、`verifyWidgetRuntimeAsset`。
+- 制品抽查：`link-submit-next-2.0.2.jar` 由当前源码构建。
+
 ## [2.0.1] - 2026-10-30
 
 ### Changed

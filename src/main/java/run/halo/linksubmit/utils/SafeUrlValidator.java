@@ -41,6 +41,12 @@ public final class SafeUrlValidator {
                 || !("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
                 throw new IllegalArgumentException("仅支持公网 HTTP 或 HTTPS URL");
             }
+            // 只放行 Web 默认端口：不限端口时，一个匿名请求就能探测内网/外网的
+            // 6379(Redis)、25(SMTP)、9200(ES) 等非 HTTP 服务，用于确认内网资产存活。
+            int port = uri.getPort();
+            if (port != -1 && port != 80 && port != 443) {
+                throw new IllegalArgumentException("仅支持 80 或 443 端口的 URL");
+            }
             return new ValidatedUrl(uri, resolvePublicAddresses(uri));
         } catch (UnknownHostException e) {
             throw new IllegalArgumentException("URL 主机无法解析", e);

@@ -43,6 +43,19 @@ class SafeUrlValidatorTest {
     }
 
     @Test
+    void rejectsNonWebPorts() {
+        // 不限端口时，匿名接口可用来探测 6379(Redis)、25(SMTP)、9200(ES) 等非 HTTP 服务
+        assertThrows(IllegalArgumentException.class,
+            () -> SafeUrlValidator.requirePublicHttpUrl("http://1.1.1.1:6379"));
+        assertThrows(IllegalArgumentException.class,
+            () -> SafeUrlValidator.requirePublicHttpUrl("http://1.1.1.1:25"));
+        assertThrows(IllegalArgumentException.class,
+            () -> SafeUrlValidator.requirePublicHttpUrl("https://1.1.1.1:9200/"));
+        assertDoesNotThrow(() -> SafeUrlValidator.requirePublicHttpUrl("http://1.1.1.1:80"));
+        assertDoesNotThrow(() -> SafeUrlValidator.requirePublicHttpUrl("https://1.1.1.1:443"));
+    }
+
+    @Test
     void resolverPinsConnectionsToValidatedAddresses() throws Exception {
         var validated = SafeUrlValidator.validatePublicHttpUrl("https://1.1.1.1");
         var resolverGroup = SafeUrlValidator.pinnedResolver(validated);

@@ -178,11 +178,15 @@ public class AnonymousEndpoint implements CustomEndpoint {
             .flatMap(result -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(result))
             .onErrorResume(RequestNotPermitted.class,
                 e -> tooManyRequests("网站信息获取过于频繁，请稍后再试"))
-            .onErrorResume(IllegalArgumentException.class, e ->
-                ServerResponse.badRequest().bodyValue(Map.of(
+            .onErrorResume(IllegalArgumentException.class, e -> {
+                // 具体原因（内网地址被拒 / 主机无法解析 / 端口不允许）只写日志。
+                // 原样回显等于给出「这个主机是否存在、是否在内网」的探测 oracle。
+                log.warn("Rejected site-info url {}: {}", finalUrl, e.getMessage());
+                return ServerResponse.badRequest().bodyValue(Map.of(
                     "title", "URL 不可访问",
                     "status", 400,
-                    "detail", e.getMessage())))
+                    "detail", "该地址不受支持或无法访问"));
+            })
             .onErrorResume(e -> {
                 log.warn("Failed to fetch site info for {}: {}", finalUrl, e.getMessage());
                 return ServerResponse.status(502).bodyValue(Map.of(
