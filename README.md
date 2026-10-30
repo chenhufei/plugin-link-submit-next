@@ -1,34 +1,30 @@
-# 友链自助提交 Next
+# 友链申请增强
 
-> 基于 Halo 官方 PluginLinks 的前台申请增强插件，提供申请弹窗、验证码、网站信息预览和主题集成。
+> 基于 Halo 官方 PluginLinks 的前台申请增强插件：访客在官方申请表单填写网址后，可一键获取网站标题、描述和 Logo 并自动填充。
 
-友链自助提交 Next 面向需要开放“申请友链”入口的 Halo 站点。它负责前台交互和网站信息提取，正式申请、审核、通知与友链数据由 Halo 官方 `PluginLinks` 插件负责。
+本插件只做一件事——把“逐个字段手抄网站信息”变成一次点击。申请表单本身、提交、验证码、限流、审核、通知和正式友链数据全部由 Halo 官方 `PluginLinks` 插件负责。
 
 ## 重要边界
 
 > 本插件不是友链存储插件，也不会替代 Halo 官方 `PluginLinks` 的链接管理页面、数据模型和正式友链数据。
 
-本插件不会建立第二套正式友链数据，也不会替代官方链接管理页面。旧版本遗留申请记录仅保留只读兼容查询；新申请直接调用 `PluginLinks >= 2.3.0` 提供的验证码和申请接口。
+- 不注册任何 Extension，不建立第二套申请数据，不提供审核或通知流程。
+- 不渲染申请表单、不采集验证码、不提交申请；表单由主题按官方接口渲染。
+- 旧版本遗留申请对象保留在 Halo 存储中，但本插件不再注册、查询或操作这套历史模型。
 
 ## 核心能力
 
-### 前台申请增强
-
-- 在 `/links` 页面自动注入 `LinkSubmitWidget`，可配置是否显示浮动“提交友链”按钮。
-- 调用官方申请接口，收集网址、标题、Logo、RSS、描述、回链和邮箱。
-- 使用官方 CAPTCHA 接口，避免在插件内重复实现验证码和匿名提交限流。
-- 通过后端代理获取网站标题、描述和 favicon，避免浏览器跨域限制。
-
-### 管理入口与兼容
-
-- 后台增强页提供返回官方链接管理、打开前台友链页和增强设置入口。
-- 新申请、审核、邮件和定时清理由官方 `PluginLinks` 统一提供，避免重复通知与重复数据模型；本插件不再注册旧版通知模板或旧版定时任务页面。
+- 在 `/links` 页面识别官方申请表单（`form[action*="links/apply/submit"]`），在网址字段旁注入“获取信息”按钮。
+- 通过服务端安全代理读取目标网站的 `og:title`、`og:description`、`og:image`（并回退到 `meta[name=description]`、`link[rel~=icon]`、`/favicon.ico`），避免浏览器跨域限制。
+- 只填充空白字段和上一次自动填入的值，访客手改过的内容不会被覆盖。
+- 提供后台开关：可关闭增强脚本，或单独关闭网站信息获取接口。
+- 官方链接管理页提供一个非关键的“增强设置”快捷入口；审核仍在官方链接管理中完成。
 
 ## 环境要求与依赖
 
 | 项目 | 要求 |
 | --- | --- |
-| Halo | `>= 2.26.0` |
+| Halo | `>= 2.27.0` |
 | 官方 PluginLinks | `>= 2.3.0`，必需 |
 | Java | 21，源码构建需要 |
 
@@ -39,36 +35,52 @@
 ## 安装与启用
 
 1. 下载 `link-submit-next-<version>.jar`。
-2. 在 Halo 控制台进入“插件管理”，上传 JAR；插件默认启用，若已被手动停用请重新启用“友链自助提交 Next”。
+2. 在 Halo 控制台进入“插件管理”，上传 JAR；插件默认启用。
 3. 确认官方 PluginLinks 已启用，并在官方插件中完成申请和审核配置。
-4. 打开本插件设置，选择是否加载前台资源、是否显示默认提交按钮和是否允许网站信息预览。
-5. 访问站点 `/links` 页面验证申请入口；需要自定义按钮时可调用 `LinkSubmitWidget.open()`。
+4. 打开本插件设置，按需保留“加载增强脚本”和“自动获取网站信息”。
+5. 访问站点 `/links` 页面，在官方申请表单的网址字段旁确认“获取信息”按钮可用。
 
 ## 设置说明
 
 | 设置组 | 用途 |
 | --- | --- |
-| 前台增强 | 是否加载 Widget、显示提交按钮和网站信息预览 |
-| 申请与审核 | 由官方 PluginLinks 管理 |
-| 消息通知 | 由官方 PluginLinks 管理 |
+| 前台增强 | 是否加载增强脚本、是否允许服务端获取网站信息 |
+| 申请表单与提交 | 由官方 PluginLinks 与主题负责，本插件不提供 |
+| 申请与审核、消息通知 | 由官方 PluginLinks 管理 |
 
-关闭“加载插件资源”后，主题可以自行提供按钮和样式；申请、审核、通知和正式友链数据仍由官方 PluginLinks 负责。
+两个开关的作用范围：
+
+- 关闭“加载增强脚本”后不再注入按钮；`site-info` 接口仍存在但不再被前台调用。
+- 关闭“自动获取网站信息”后，注入脚本带 `data-link-preview-enabled="false"`，按钮不再出现，接口直接返回 403。
 
 ## 主题集成
 
-默认情况下，插件只在 `/links` 路由注入脚本与样式，避免在全站加载提交组件。适配主题可以使用以下调用打开已经注入的表单：
+主题负责按官方接口渲染申请表单，字段名使用官方约定：`url`、`displayName`、`logo`、`description`、`email`、`backlink`、`feedUrls`、`captchaCode`，提交到 `POST /links/apply/submit`（携带 `_csrf`）。插件注入的元素如下，主题可据此定制样式：
 
 ```html
-<button type="button" onclick="LinkSubmitWidget.open()">申请友链</button>
+<span class="link-enhance-tools">
+  <button type="button" class="link-enhance-fetch" data-link-enhance-fetch="true">获取信息</button>
+  <span class="link-enhance-status" role="status" aria-live="polite"></span>
+</span>
 ```
 
-NUCMA 主题已适配该入口。主题不应复制提交表单、审核流程或官方友链存储逻辑。
+被增强的表单会带上 `data-link-enhanced="true"`；状态节点通过 `data-status="idle|pending|success|error"` 表示当前结果。NUCMA 主题已适配该结构。
+
+主题不应复制提交表单的校验逻辑，也不应另建一套友链存储或审核流程。
+
+## 公开接口
+
+| 方法与路径 | 用途 |
+| --- | --- |
+| `GET /apis/api.link.submit.halo.run/v1alpha1/site-info?url=` | 服务端代理获取网站标题、描述与 Logo |
+
+接口匿名可用，但受服务端保护：仅允许公网 HTTP(S) 地址、逐跳重定向重新校验并固定 DNS 解析、限制响应体大小与超时、按访问来源 IP 限流（每分钟 12 次），超限返回符合 RFC 7807 的 `429` 并带 `Retry-After`。
 
 ## 安全与运行说明
 
-- 匿名接口只开放配置读取和站点信息预览；申请和验证码由官方 PluginLinks 接口负责，审核需要 Halo 权限。
 - 网站信息抓取会由服务器访问申请者填写的网址。请按站点的网络策略使用，并为超时或不可访问站点保留手动填写入口。
-- 申请、审核和邮件通知依赖官方 PluginLinks 及 Halo 的通知能力；未配置时，本插件不会自行创建替代流程。
+- 匿名接口只开放站点信息预览，不提供任何写入能力；申请、验证码、审核和邮件通知依赖官方 PluginLinks 及 Halo 的通知能力。
+- 自动填充的标题、描述和 Logo 只是访客填写的便利输入，仍会经过官方申请校验与人工审核。
 
 ## 从源码构建
 
@@ -83,13 +95,13 @@ NUCMA 主题已适配该入口。主题不应复制提交表单、审核流程�
 build/libs/link-submit-next-<version>.jar
 ```
 
-Console、公开 Widget 和 API Client 均由 Gradle 关联任务生成和打包，不要手工修改构建生成物。
+Console bundle 和增强脚本运行时资源均由 Gradle 关联任务生成和打包，不要手工修改构建生成物。
 
 ## 来源与致谢
 
 - 上游项目：[chengzhongxue/link-submit](https://github.com/chengzhongxue/link-submit)。原作者为困困鱼（GitHub [chengzhongxue](https://github.com/chengzhongxue)）。
 - 上游 README 还注明部分代码由 [柳意梧情](https://github.com/liuyiwuqing) 提供，本项目保留这一致谢。
-- 本项目是对上游友链提交插件的二次开发与重构：适配 `PluginLinks >= 2.3.0`，规范命名空间、保留主题集成与网站信息预览，并保持申请、审核、通知和正式友链数据由官方 PluginLinks 管理。
+- 本项目是对上游友链提交插件的二次开发与重构：把自建申请弹窗、验证码和提交流程收缩为仅保留服务端网站信息获取，申请、审核、通知和正式友链数据改由官方 `PluginLinks` 提供。
 - 当前维护仓库：[chenhufei/plugin-link-submit-next](https://github.com/chenhufei/plugin-link-submit-next)。
 
 ## 反馈与许可

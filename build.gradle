@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'run.halo.linksubmit'
-version '1.2.8'
+version '2.0.1'
 
 repositories {
     mavenCentral()
@@ -15,7 +15,7 @@ repositories {
 }
 
 dependencies {
-    implementation platform('run.halo.tools.platform:plugin:2.26.0')
+    implementation platform('run.halo.tools.platform:plugin:2.27.1')
     compileOnly 'run.halo.app:api'
 
     testImplementation 'run.halo.app:api'
@@ -51,7 +51,7 @@ tasks.named('classes') {
 }
 
 halo {
-    version = '2.26.0'
+    version = '2.27.1'
 }
 
 tasks.register('verifyVersionConsistency') {
@@ -145,62 +145,104 @@ tasks.register('verifyPublicationMetadata') {
 
 tasks.register('verifyEnhancementBoundary') {
     group = 'verification'
-    description = 'Ensure the plugin remains an enhancement for official PluginLinks.'
+    description = 'Ensure the plugin remains a thin enhancement for official PluginLinks.'
     inputs.files(
-        layout.projectDirectory.file('src/main/java/run/halo/linksubmit/endpoint/AnonymousEndpoint.java'),
-        layout.projectDirectory.file('src/main/java/run/halo/linksubmit/endpoint/LinkSubmitEndpoint.java'),
-        layout.projectDirectory.file('ui/src/views/HomeView.vue'),
-        layout.projectDirectory.file('packages/link-submit-widget/src/link-submit-modal.ts'),
-        layout.projectDirectory.file('src/main/resources/plugin.yaml')
+        fileTree('src/main/java'),
+        layout.projectDirectory.file('src/main/resources/plugin.yaml'),
+        layout.projectDirectory.file('src/main/resources/extensions/settings.yaml'),
+        layout.projectDirectory.file('packages/link-submit-widget/src/index.ts'),
+        layout.projectDirectory.file('packages/link-submit-widget/src/site-info.ts')
     )
     doLast {
+        fileTree('src/main/java').each { source ->
+            def javaText = source.getText('UTF-8')
+            ['schemeManager.register', 'LinkSubmit.class', 'linksubmits', 'link-applications']
+                .each { forbidden ->
+                    if (javaText.contains(forbidden)) {
+                        throw new GradleException(
+                            "Enhancement plugin must not own application data or writes: ${forbidden} in ${source.name}"
+                        )
+                    }
+                }
+        }
+
         def anonymousEndpoint = layout.projectDirectory
             .file('src/main/java/run/halo/linksubmit/endpoint/AnonymousEndpoint.java')
             .asFile.getText('UTF-8')
-        def consoleEndpoint = layout.projectDirectory
-            .file('src/main/java/run/halo/linksubmit/endpoint/LinkSubmitEndpoint.java')
-            .asFile.getText('UTF-8')
-        ['linksubmits/-/submit', '.POST("linksubmits'].each { forbidden ->
-            if (anonymousEndpoint.contains(forbidden) || consoleEndpoint.contains(forbidden)) {
-                throw new GradleException("Legacy link submission write API is forbidden: ${forbidden}")
+        if (!anonymousEndpoint.contains('.GET("site-info"')) {
+            throw new GradleException('site-info is the only public API this enhancement may expose')
+        }
+        ['.POST(', '"configuration"'].each { forbidden ->
+            if (anonymousEndpoint.contains(forbidden)) {
+                throw new GradleException("Anonymous API must stay read-only and single-purpose: ${forbidden}")
             }
         }
 
-        def homeView = layout.projectDirectory.file('ui/src/views/HomeView.vue')
+        def footerProcessor = layout.projectDirectory
+            .file('src/main/java/run/halo/linksubmit/LinkApplyEnhanceFooterProcessor.java')
             .asFile.getText('UTF-8')
-        ['SubmitList', '<Cron', '定时任务'].each { forbidden ->
-            if (homeView.contains(forbidden)) {
-                throw new GradleException("Enhancement console must not expose legacy workflow: ${forbidden}")
+        ['link-apply-enhance.iife.js', 'data-link-preview-enabled'].each { required ->
+            if (!footerProcessor.contains(required)) {
+                throw new GradleException("Footer processor must inject the enhancement script: ${required}")
+            }
+        }
+        ['var.css', 'link-submit-widget', 'displayTheSubmitButton'].each { forbidden ->
+            if (footerProcessor.contains(forbidden)) {
+                throw new GradleException("Footer processor must not revive the legacy widget shell: ${forbidden}")
             }
         }
 
         def widget = layout.projectDirectory
-            .file('packages/link-submit-widget/src/link-submit-modal.ts').asFile.getText('UTF-8')
-        ['api.link.halo.run/v1alpha1/link-applications', '/captcha'].each { required ->
+            .file('packages/link-submit-widget/src/index.ts').asFile.getText('UTF-8')
+        ['links/apply/submit', 'data-link-enhance'].each { required ->
             if (!widget.contains(required)) {
-                throw new GradleException("Widget must use official PluginLinks API: ${required}")
+                throw new GradleException("Enhancement script must attach to the official form: ${required}")
+            }
+        }
+        ['api.link.halo.run/v1alpha1/link-applications', 'captcha', 'fetchDocument']
+            .each { forbidden ->
+                if (widget.contains(forbidden)) {
+                    throw new GradleException(
+                        "Enhancement script must not submit applications or reimplement the official form: ${forbidden}"
+                    )
+                }
+            }
+
+        def siteInfo = layout.projectDirectory
+            .file('packages/link-submit-widget/src/site-info.ts').asFile.getText('UTF-8')
+        if (!siteInfo.contains('/apis/api.link.submit.halo.run/v1alpha1/site-info')) {
+            throw new GradleException('Enhancement must call this plugin site-info endpoint only')
+        }
+
+        def settingsYaml = layout.projectDirectory
+            .file('src/main/resources/extensions/settings.yaml').asFile.getText('UTF-8')
+        ['displayTheSubmitButton', 'autoAudit', 'enableHealthCheck'].each { forbidden ->
+            if (settingsYaml.contains(forbidden)) {
+                throw new GradleException("Settings must not expose retired switches: ${forbidden}")
             }
         }
 
         def pluginYaml = layout.projectDirectory.file('src/main/resources/plugin.yaml')
             .asFile.getText('UTF-8')
-        if (!pluginYaml.contains('"PluginLinks": ">=2.3.0"')) {
-            throw new GradleException('PluginLinks dependency must require the verified 2.3.0 API')
+        if (!pluginYaml.contains('"PluginLinks": ">=2.3.0 & <3.0.0"')) {
+            throw new GradleException(
+                'PluginLinks dependency must use the verified 2.x application API range'
+            )
         }
-        if (!pluginYaml.contains('requires: ">=2.26.0"')) {
-            throw new GradleException('PluginLinks 2.3.0 requires Halo 2.26 or newer')
+        if (!pluginYaml.contains('requires: ">=2.27.0"')) {
+            throw new GradleException('Halo 2.27 is the verified minimum for the 2.27 build target')
         }
-        def widgetEntry = layout.projectDirectory
-            .file('packages/link-submit-widget/src/index.ts').asFile.getText('UTF-8')
-        ['data-link-application-enabled', 'isOfficialApplicationEnabled', 'trigger.hidden = true']
-            .each { required ->
-                if (!widgetEntry.contains(required)) {
-                    throw new GradleException("Widget must guard disabled official applications: ${required}")
-                }
-            }
         ['notification.yaml', 'notification-templates.yaml'].each { filename ->
             if (file("src/main/resources/extensions/${filename}").exists()) {
                 throw new GradleException("Enhancement plugin must not register legacy notification resource: ${filename}")
+            }
+        }
+        ['src/main/resources/static/link-submit-widget.iife.js',
+         'src/main/resources/static/var.css',
+         'src/main/java/run/halo/linksubmit/extension',
+         'ui/src/api'].each { legacy ->
+            if (file(legacy).exists()) {
+                throw new GradleException("Legacy self-built submission asset is still present: ${legacy}")
             }
         }
     }
@@ -208,15 +250,20 @@ tasks.register('verifyEnhancementBoundary') {
 
 tasks.register('verifyWidgetRuntimeAsset') {
     group = 'verification'
-    description = 'Verify the packaged widget runtime asset matches the guarded source contract.'
+    description = 'Verify the packaged enhancement runtime asset matches the source contract.'
     dependsOn project(':packages:link-submit-widget').tasks.named('build')
-    inputs.file(layout.projectDirectory.file('src/main/resources/static/link-submit-widget.iife.js'))
+    inputs.file(layout.projectDirectory.file('src/main/resources/static/link-apply-enhance.iife.js'))
     doLast {
-        def runtimeWidget = layout.projectDirectory
-            .file('src/main/resources/static/link-submit-widget.iife.js').asFile.getText('UTF-8')
-        ['data-link-application-enabled', 'aria-hidden'].each { required ->
-            if (!runtimeWidget.contains(required)) {
-                throw new GradleException("Generated widget runtime asset is stale: ${required}")
+        def runtimeAsset = layout.projectDirectory
+            .file('src/main/resources/static/link-apply-enhance.iife.js').asFile.getText('UTF-8')
+        ['links/apply/submit', 'data-link-enhance'].each { required ->
+            if (!runtimeAsset.contains(required)) {
+                throw new GradleException("Generated enhancement runtime asset is stale: ${required}")
+            }
+        }
+        ['link-applications', 'captcha'].each { forbidden ->
+            if (runtimeAsset.contains(forbidden)) {
+                throw new GradleException("Enhancement asset must not own official submission: ${forbidden}")
             }
         }
     }
@@ -229,30 +276,4 @@ tasks.named('check') {
     dependsOn('verifyWidgetRuntimeAsset')
     dependsOn project(':packages:link-submit-widget').tasks.named('testFrontend')
     dependsOn project(':packages:link-submit-widget').tasks.named('lintFrontend')
-}
-
-haloPlugin {
-    openApi {
-        outputDir = file("$rootDir/api-docs/openapi/v3_0")
-        // 用于定义 API 分组规则
-        groupingRules {
-            // 此名称为 group name，定义后 groupedApiMappings 中的 /v3/api-docs/ 后的名称需要与之相同，要避免与 halo 中已经存在的 group 相同避免生成后出现与插件无关的 API
-            linkSubmitApi {
-                // 分组显示名称
-                displayName = 'Extension API for Plugin linkSubmit'
-                // 分组的 API 规则
-                pathsToMatch = ["/apis/link.submit.halo.run/v1alpha1/**",
-                                "/apis/console.api.link.submit.halo.run/v1alpha1/**"
-                ]
-            }
-        }
-        groupedApiMappings = [
-                '/v3/api-docs/linkSubmitApi': 'linkSubmitApi.json'
-        ]
-        generator {
-            // 默认配置可缺省
-            outputDir = file("${projectDir}/ui/src/api/generated")
-        }
-    }
-
 }

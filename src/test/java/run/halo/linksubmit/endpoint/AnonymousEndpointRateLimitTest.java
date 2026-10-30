@@ -50,13 +50,13 @@ class AnonymousEndpointRateLimitTest {
     }
 
     @Test
-    void shouldNotExposeLegacySubmissionRoute() {
+    void shouldOnlyExposeSiteInfoRoute() {
         var settings = mock(SettingConfigLinkSubmit.class);
         var endpoint = new AnonymousEndpoint(settings, RateLimiterRegistry.ofDefaults());
 
         var routeText = endpoint.endpoint().toString();
-        assertThat(routeText).doesNotContain("linksubmits/-/submit");
-        assertThat(routeText).contains("configuration", "site-info");
+        assertThat(routeText).doesNotContain("linksubmits/-/submit", "configuration");
+        assertThat(routeText).contains("site-info");
     }
 
     @Test

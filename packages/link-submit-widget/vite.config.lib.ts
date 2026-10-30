@@ -1,7 +1,8 @@
 import { fileURLToPath } from 'url';
-import { cpSync, mkdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync } from 'node:fs';
 import { defineConfig } from 'vite';
-import dts from 'vite-plugin-dts';
+
+const RUNTIME_ASSET_NAME = 'link-apply-enhance.iife.js';
 
 function syncRuntimeAssets() {
   return {
@@ -11,8 +12,7 @@ function syncRuntimeAssets() {
         new URL('../../src/main/resources/static', import.meta.url),
       );
       mkdirSync(runtimeDirectory, { recursive: true });
-      cpSync('dist/link-submit-widget.iife.js', `${runtimeDirectory}/link-submit-widget.iife.js`);
-      cpSync('var.css', `${runtimeDirectory}/var.css`);
+      copyFileSync(`dist/${RUNTIME_ASSET_NAME}`, `${runtimeDirectory}/${RUNTIME_ASSET_NAME}`);
     },
   };
 }
@@ -21,8 +21,8 @@ export default defineConfig({
   build: {
     lib: {
       entry: 'src/index.ts',
-      name: 'LinkSubmitWidget',
-      fileName: 'link-submit-widget',
+      name: 'LinkApplyEnhance',
+      fileName: 'link-apply-enhance',
       formats: ['iife', 'es'],
     },
     emptyOutDir: true,
@@ -32,5 +32,5 @@ export default defineConfig({
       },
     },
   },
-  plugins: [dts(), syncRuntimeAssets()],
+  plugins: [syncRuntimeAssets()],
 });

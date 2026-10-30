@@ -39,18 +39,12 @@ describe('installLinksManagementEntry', () => {
 
     const entries = document.querySelectorAll('[data-link-submit-next-entry]')
     expect(entries).toHaveLength(1)
-    expect(entries[0]?.getAttribute('href')).toBe('/console/tools/link-submit-next')
-    expect(entries[0]?.textContent).toContain('申请增强')
+    expect(entries[0]?.getAttribute('href')).toBe('/console/plugins/link-submit-next?tab=basic')
+    expect(entries[0]?.textContent).toContain('增强设置')
   })
 
-  it('stays hidden without permission or an exact official page match', async () => {
+  it('stays hidden without permission', async () => {
     window.history.replaceState({}, '', '/console/links')
-    renderLinksHeader('成员管理')
-    installLinksManagementEntry({ hasPermission: () => true })
-    await flushMutations()
-    expect(document.querySelector('[data-link-submit-next-entry]')).toBeNull()
-
-    window.__linkSubmitNextLinksEntryCleanup?.()
     renderLinksHeader()
     installLinksManagementEntry({ hasPermission: () => false })
     await flushMutations()

@@ -10,16 +10,8 @@ spec:
         - $formkit: switch
           name: loadPlugInResources
           id: loadPlugInResources
-          label: 加载插件资源
-          help: 在友链页加载增强申请弹窗；申请数据、审核和通知由 Halo 官方链接插件负责
-          value: true
-        - $formkit: switch
-          if: $get(loadPlugInResources).value
-          name: displayTheSubmitButton
-          id: displayTheSubmitButton
-          key: displayTheSubmitButton
-          label: 显示提交按钮
-          help: 主题已经提供申请按钮时可关闭，仍可通过 LinkSubmitWidget.open() 打开弹窗
+          label: 加载增强脚本
+          help: 在友链页官方 PluginLinks 申请表单旁注入「获取信息」按钮；申请、审核与通知仍由官方链接插件负责
           value: true
         - $formkit: switch
           name: enableLinkPreview

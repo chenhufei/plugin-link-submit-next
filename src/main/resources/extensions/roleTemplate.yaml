@@ -11,10 +11,9 @@ metadata:
     rbac.authorization.halo.run/display-name: "PluginLinkSubmit Anonymous AccessRole"
 rules:
   - apiGroups: [ "api.link.submit.halo.run" ]
-    resources: [ "configuration", "site-info" ]
+    resources: [ "site-info" ]
     verbs: [ "get", "list" ]
   - nonResourceURLs:
-      - "/apis/api.link.submit.halo.run/v1alpha1/configuration"
       - "/apis/api.link.submit.halo.run/v1alpha1/site-info"
     verbs: [ "get" ]
 
@@ -32,12 +31,6 @@ metadata:
     rbac.authorization.halo.run/display-name: "友链申请增强查看"
     rbac.authorization.halo.run/ui-permissions: |
       ["plugin:link:submit-next:view"]
-rules:
-  - apiGroups: [ "link.submit.halo.run" ]
-    resources: [ "linksubmits" ]
-    verbs: [ "get", "list" ]
-  - apiGroups: [ "console.api.link.submit.halo.run" ]
-    resources: [ "linksubmits"]
-    verbs: [ "get", "list" ]
+rules: []
 
 ---

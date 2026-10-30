@@ -24,9 +24,9 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
-import reactor.netty.http.client.HttpClient;
 import run.halo.app.core.extension.endpoint.CustomEndpoint;
 import run.halo.app.extension.GroupVersion;
+import run.halo.app.infra.utils.HttpSecurityUtils;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -35,7 +35,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.springdoc.core.fn.builders.apiresponse.Builder.responseBuilder;
-import static org.springdoc.core.fn.builders.content.Builder.contentBuilder;
 import static org.springdoc.core.fn.builders.parameter.Builder.parameterBuilder;
 
 @Slf4j
@@ -75,12 +74,6 @@ public class AnonymousEndpoint implements CustomEndpoint {
     @Override
     public RouterFunction<ServerResponse> endpoint() {
         return SpringdocRouteBuilder.route()
-            .GET("configuration", this::configuration, builder -> {
-                builder.operationId("linkSubmitConfiguration")
-                    .description("友链自助提交公开功能配置")
-                    .tag(TAG)
-                    .response(responseBuilder().implementation(Map.class));
-            })
             .GET("site-info", this::fetchSiteInfo,
                 builder -> builder.operationId("fetchSiteInfo")
                     .description("根据网址获取网站标题、描述、Logo等信息")
@@ -92,12 +85,6 @@ public class AnonymousEndpoint implements CustomEndpoint {
                     .response(responseBuilder()
                         .implementation(Map.class))
             ).build();
-    }
-
-    Mono<ServerResponse> configuration(ServerRequest request) {
-        return settingConfigLinkSubmit.getBasicConfig()
-            .flatMap(config -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of("linkPreviewEnabled", config.isEnableLinkPreview())));
     }
 
     /**
@@ -137,37 +124,37 @@ public class AnonymousEndpoint implements CustomEndpoint {
                 documentUrl = finalUrl;
             }
 
-            String title = null;
-            // 优先 og:title
-            Element ogTitle = doc.selectFirst("meta[property=og:title]");
-            if (ogTitle != null && !ogTitle.attr("content").isBlank()) {
-                title = ogTitle.attr("content").trim();
-            }
-            if (title == null || title.isEmpty()) {
-                title = doc.title();
+            // 解析顺序与官方友链后台「获取网站信息」一致：<title> / meta description / rel=icon，
+            // og 标签只在标准标签缺失时兜底
+            String title = doc.title();
+            if (title == null || title.isBlank()) {
+                Element ogTitle = doc.selectFirst("meta[property=og:title]");
+                if (ogTitle != null && !ogTitle.attr("content").isBlank()) {
+                    title = ogTitle.attr("content").trim();
+                }
             }
 
             String description = null;
-            Element ogDesc = doc.selectFirst("meta[property=og:description]");
-            if (ogDesc != null && !ogDesc.attr("content").isBlank()) {
-                description = ogDesc.attr("content").trim();
+            Element metaDesc = doc.selectFirst("meta[name=description]");
+            if (metaDesc != null && !metaDesc.attr("content").isBlank()) {
+                description = metaDesc.attr("content").trim();
             }
             if (description == null || description.isEmpty()) {
-                Element metaDesc = doc.selectFirst("meta[name=description]");
-                if (metaDesc != null && !metaDesc.attr("content").isBlank()) {
-                    description = metaDesc.attr("content").trim();
+                Element ogDesc = doc.selectFirst("meta[property=og:description]");
+                if (ogDesc != null && !ogDesc.attr("content").isBlank()) {
+                    description = ogDesc.attr("content").trim();
                 }
             }
 
             String logo = null;
-            Element ogImage = doc.selectFirst("meta[property=og:image]");
-            if (ogImage != null && !ogImage.attr("content").isBlank()) {
-                logo = absUrl(ogImage.attr("content").trim(), documentUrl);
+            Element iconLink = doc.selectFirst("link[rel~=icon]");
+            if (iconLink != null && !iconLink.attr("href").isBlank()) {
+                logo = absUrl(iconLink.attr("href").trim(), documentUrl);
             }
             if (logo == null || logo.isEmpty()) {
-                Element iconLink = doc.selectFirst("link[rel~=icon]");
-                if (iconLink != null && !iconLink.attr("href").isBlank()) {
-                    logo = absUrl(iconLink.attr("href").trim(), documentUrl);
+                Element ogImage = doc.selectFirst("meta[property=og:image]");
+                if (ogImage != null && !ogImage.attr("content").isBlank()) {
+                    logo = absUrl(ogImage.attr("content").trim(), documentUrl);
                 }
             }
             // 兜底 favicon
@@ -265,13 +252,14 @@ public class AnonymousEndpoint implements CustomEndpoint {
     private static PinnedHttpResponse fetchPinned(SafeUrlValidator.ValidatedUrl validatedUrl) {
         var resolver = SafeUrlValidator.pinnedResolver(validatedUrl);
         try {
-            var httpClient = HttpClient.newConnection()
+            var httpClient = HttpSecurityUtils.secureHttpClient()
                 .resolver(resolver)
                 .followRedirect(false)
                 .compress(true)
                 .responseTimeout(Duration.ofSeconds(8));
             var webClient = WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .filter(HttpSecurityUtils.maxResponseSizeFilter(SITE_INFO_MAX_BODY_BYTES))
                 .codecs(configurer -> configurer.defaultCodecs()
                     .maxInMemorySize(SITE_INFO_MAX_BODY_BYTES))
                 .build();

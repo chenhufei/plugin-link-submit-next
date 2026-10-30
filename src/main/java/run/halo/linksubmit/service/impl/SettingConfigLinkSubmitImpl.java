@@ -20,7 +20,6 @@ public class SettingConfigLinkSubmitImpl implements SettingConfigLinkSubmit {
             .map(basic -> {
                 var config = new BasicConfig();
                 config.setLoadPlugInResources(basic.isLoadPlugInResources());
-                config.setDisplayTheSubmitButton(basic.isDisplayTheSubmitButton());
                 config.setEnableLinkPreview(basic.isEnableLinkPreview());
                 return config;
             });
