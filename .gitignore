@@ -78,3 +78,11 @@ application-local.properties
 /ui/build/
 /workplace/
 /src/main/resources/console/
+# Widget / UI 构建生成物：由 Gradle 关联任务重新生成，不入库
+/src/main/resources/static/
+/src/main/resources/ui/
+
+# 本地快捷方式与编译诊断输出
+*.lnk
+compile*.txt
+diag.txt
