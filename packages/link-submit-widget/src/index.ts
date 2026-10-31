@@ -10,7 +10,14 @@ import {
 } from './site-info';
 
 const ENHANCE_SCRIPT_SELECTOR = 'script[data-link-enhance]';
-const APPLY_FORM_SELECTOR = 'form[action*="links/apply/submit"]';
+// 官方主题与插件的表单 action 可能写成相对路径，也可能写成绝对地址。
+// 用 jQuery 风格的 [action*=] 选择器去匹配时，[action*="/links/apply/submit"] 与
+// [action*="links/apply/submit"] 必须二选一，总有一半场景会漏掉，这里直接按路径判断。
+// PluginLinks 2.5 起访客申请改走 REST 接口，action 不再固定，
+// 因此再补一条「按字段特征识别」的兜底：含 url + displayName + logo 的表单即申请表单。
+// 本插件不提交申请、不复制官方表单，所以不出现任何申请接口地址。
+const APPLY_FORM_ACTION_PATHS = ['/links/apply/submit'];
+const APPLY_FORM_REQUIRED_FIELDS = ['url', 'displayName', 'logo'];
 const TOOLS_CLASS = 'link-enhance-tools';
 const FIELD_CLASS = 'link-enhance-url-wrap';
 const BUTTON_CLASS = 'link-enhance-fetch';
@@ -168,17 +175,60 @@ function enhanceForm(form: HTMLFormElement): void {
   });
 }
 
-function enhanceLinkApplyForms(): void {
+function hasApplyFormFields(form: HTMLFormElement): boolean {
+  return APPLY_FORM_REQUIRED_FIELDS.every(
+    (name) => form.querySelector(`[name="${name}"]`) !== null
+  );
+}
+
+function matchesApplyForm(form: HTMLFormElement): boolean {
+  const action = form.getAttribute('action') ?? '';
+  const hit = (value: string) => APPLY_FORM_ACTION_PATHS.some((path) => value.includes(path));
+  if (hit(action)) return true;
+  try {
+    if (hit(new URL(action, window.location.href).pathname)) return true;
+  } catch {
+    // action 为空或非法时继续走字段特征判断
+  }
+  return hasApplyFormFields(form);
+}
+
+export function enhanceLinkApplyForms(): void {
   if (!isLinkPreviewEnabled()) return;
-  document
-    .querySelectorAll<HTMLFormElement>(APPLY_FORM_SELECTOR)
+  Array.from(document.querySelectorAll<HTMLFormElement>('form[action]'))
+    .filter(matchesApplyForm)
     .forEach((form) => enhanceForm(form));
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', enhanceLinkApplyForms, { once: true });
-} else {
-  enhanceLinkApplyForms();
+let enhanceScheduled = false;
+
+function scheduleEnhance(): void {
+  if (enhanceScheduled) return;
+  enhanceScheduled = true;
+  requestAnimationFrame(() => {
+    enhanceScheduled = false;
+    enhanceLinkApplyForms();
+  });
 }
 
-export { enhanceLinkApplyForms };
+/**
+ * 表单可能由主题异步渲染，也可能在弹窗打开后才插入 DOM。
+ * 一次扫描之外再挂一个只在「新增了节点」时才触发的观察者，
+ * 并用 rAF 合并同一帧的多次变动，避免主题每次输入都触发一遍表单扫描。
+ */
+function startEnhancing(): void {
+  enhanceLinkApplyForms();
+  if (typeof MutationObserver === 'undefined' || !document.body) return;
+  const observer = new MutationObserver((records) => {
+    if (records.some((record) => record.addedNodes.length > 0)) {
+      scheduleEnhance();
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startEnhancing, { once: true });
+} else {
+  startEnhancing();
+}

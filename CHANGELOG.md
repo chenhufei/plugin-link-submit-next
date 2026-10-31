@@ -1,5 +1,37 @@
 # 更新日志
 
+## [2.0.4] - 2026-10-31
+
+### Fixed
+- **主题改用 REST 契约后「获取信息」按钮消失**：增强脚本原本只按 `/links/apply/submit`
+  识别申请表单，而 PluginLinks 2.5 的访客申请走 `api.link.halo.run` 的 POST 接口，
+  表单 `action` 不再固定。现在额外按字段特征（`url` + `displayName` + `logo`）兜底识别，
+  两种契约的主题都能注入按钮。本插件仍然只读 `site-info`，不提交申请、不复制官方表单。
+
+## [2.0.3] - 2026-10-31
+
+### Fixed
+- **非 UTF-8 站点标题乱码**：`site-info` 先用默认字符集把响应体解码成 String 再交给 Jsoup，
+  `<meta charset>` 已无从补救，GBK/GB2312 站点抓回来的标题必然是乱码。改为按响应
+  `Content-Type` 的字符集解析字节，缺失时交给 Jsoup 依据页面 meta 自动识别。
+- **配置读取失败时反而放开**：`enableLinkPreview` 读取异常或缺失时会走到开启分支，
+  这个开关本身就是保护，现改为读不到即按关闭处理（fail closed）。
+- **响应超时后 NPE**：`block(10s)` 超时返回 `null` 会在后续解引用处抛 NPE，落进通用 502 分支；
+  现在显式判空并返回统一的 502，同时给整条抓取链路加 12 秒总超时。
+- **限流器表清零策略**：临界状态下每个新客户端都会触发一次万级全表排序，且发生在事件循环上；
+  改为一次性淘汰到半水位，并把取 IP / 建限流器整体移到 `boundedElastic`。
+- **每次抓取都新建 WebClient**：连接池与编解码器无法复用，高频调用下资源抖动；公共配置抽为静态
+  builder，每次请求只 clone 后替换 connector。
+- **控制台入口观察器开销**：`MutationObserver` 监听整个 body 子树且回调直接执行 DOM 查询，
+  改为 rAF 合并同一帧内的多次变动。
+- **增强按钮漏注入**：表单 `action` 写成相对路径时选择器匹配不到；改为按 `URL.pathname` 判断，
+  并对异步渲染出来的表单加观察者兜底。
+
+### Verification
+- `./gradlew cleanTest test`：3 个测试类、15 项测试通过，0 失败 / 0 错误 / 0 跳过。
+- Widget 与 UI 构建通过（Gradle `build` 链路内的 `vite build`）。
+- 版本同步：`gradle.properties`、`build.gradle`、`plugin.yaml`、Widget 包版本均为 2.0.3。
+
 ## [2.0.2] - 2026-10-31
 
 ### Security

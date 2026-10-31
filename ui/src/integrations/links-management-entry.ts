@@ -74,10 +74,23 @@ export function installLinksManagementEntry(options: EntryOptions = {}) {
     }
   }
 
+  // 控制台每次渲染都会产生成百上千条 DOM 变动记录。
+  // 直接把 syncEntry 挂上去会在一帧内被调用几十次，每次都要走一遍 querySelector；
+  // 这里用 rAF 把同一帧内的变动合并成一次同步，syncEntry 本身也是幂等的。
+  let syncScheduled = false
+  const scheduleSync = () => {
+    if (syncScheduled) return
+    syncScheduled = true
+    requestAnimationFrame(() => {
+      syncScheduled = false
+      syncEntry()
+    })
+  }
+
   const start = () => {
     if (!document.body || observer) return
     syncEntry()
-    observer = new MutationObserver(syncEntry)
+    observer = new MutationObserver(scheduleSync)
     observer.observe(document.body, { childList: true, subtree: true })
   }
 
