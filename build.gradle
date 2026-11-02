@@ -1,0 +1,279 @@
+plugins {
+    id 'java'
+    id "io.freefair.lombok" version "8.13"
+    id "run.halo.plugin.devtools" version "0.6.1"
+}
+
+group 'run.halo.linksubmit'
+version '0.0.1'
+
+repositories {
+    mavenCentral()
+    maven { url 'https://s01.oss.sonatype.org/content/repositories/releases' }
+    maven { url 'https://s01.oss.sonatype.org/content/repositories/snapshots/' }
+    maven { url 'https://repo.spring.io/milestone' }
+}
+
+dependencies {
+    implementation platform('run.halo.tools.platform:plugin:2.27.1')
+    compileOnly 'run.halo.app:api'
+
+    testImplementation 'run.halo.app:api'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 21
+}
+
+tasks.register('processUiResources', Copy) {
+    from project(':ui').layout.buildDirectory.dir('dist')
+    into layout.buildDirectory.dir('resources/main/ui')
+    dependsOn project(':ui').tasks.named('buildFrontend')
+    shouldRunAfter tasks.named('processResources')
+}
+
+tasks.named('classes') {
+    dependsOn tasks.named('processUiResources')
+    dependsOn project(':packages:link-submit-widget').tasks.named('build')
+}
+
+halo {
+    version = '2.27.1'
+}
+
+tasks.register('verifyVersionConsistency') {
+    group = 'verification'
+    description = 'Verify plugin.yaml version matches the Gradle project version.'
+    inputs.files(
+        layout.projectDirectory.file('src/main/resources/plugin.yaml'),
+        layout.projectDirectory.file('packages/link-submit-widget/package.json'),
+        layout.projectDirectory.file('gradle.properties')
+    )
+    doLast {
+        def expectedVersion = project.version.toString()
+        def gradleProperties = layout.projectDirectory.file('gradle.properties').asFile
+            .readLines('UTF-8')
+            .find { it.trim().startsWith('version=') }
+        def propertiesVersion = gradleProperties?.substring(gradleProperties.indexOf('=') + 1)?.trim()
+        if (propertiesVersion != expectedVersion) {
+            throw new GradleException(
+                "Version mismatch: Gradle=${expectedVersion}, gradle.properties=${propertiesVersion}"
+            )
+        }
+        def pluginYaml = layout.projectDirectory
+            .file('src/main/resources/plugin.yaml').asFile.getText('UTF-8')
+        def versionMatcher = pluginYaml =~ /(?m)^\s{2}version:\s*["']?([^"'\s]+)["']?\s*$/
+        if (!versionMatcher.find()) {
+            throw new GradleException('Unable to read spec.version from plugin.yaml')
+        }
+        def pluginVersion = versionMatcher.group(1)
+        if (pluginVersion != expectedVersion) {
+            throw new GradleException(
+                "Version mismatch: Gradle=${expectedVersion}, plugin.yaml=${pluginVersion}"
+            )
+        }
+        def widgetPackage = new groovy.json.JsonSlurper().parse(
+            layout.projectDirectory.file('packages/link-submit-widget/package.json').asFile
+        )
+        if (widgetPackage.version?.toString() != expectedVersion) {
+            throw new GradleException(
+                "Version mismatch: Gradle=${expectedVersion}, widget=${widgetPackage.version}"
+            )
+        }
+    }
+}
+
+tasks.register('verifyPublicationMetadata') {
+    group = 'verification'
+    description = 'Reject placeholder store metadata and preserve source attribution.'
+    inputs.files(
+        layout.projectDirectory.file('src/main/resources/plugin.yaml'),
+        layout.projectDirectory.file('packages/link-submit-widget/package.json'),
+        layout.projectDirectory.file('README.md')
+    )
+    doLast {
+        def pluginYaml = layout.projectDirectory
+            .file('src/main/resources/plugin.yaml').asFile.getText('UTF-8')
+        if (pluginYaml =~ /store\.halo\.run\/app-id:\s*["']?app-(?:link-submit-next|TODO|CHANGE_ME)["']?/) {
+            throw new GradleException('Plugin metadata contains a placeholder or upstream store app id.')
+        }
+        if (!(pluginYaml =~ /(?m)^\s{2}enabled:\s*true\s*$/)) {
+            throw new GradleException('Enhancement plugin must be enabled by default after installation.')
+        }
+        def widgetPackage = new groovy.json.JsonSlurper().parse(
+            layout.projectDirectory.file('packages/link-submit-widget/package.json').asFile
+        )
+        if (widgetPackage.name.toString().startsWith('@halo-dev/')) {
+            throw new GradleException('The widget package must not use the @halo-dev namespace.')
+        }
+        if (widgetPackage.author?.url?.toString() != 'https://github.com/chenhufei') {
+            throw new GradleException('Widget author metadata must identify the current maintainer.')
+        }
+        def cdWorkflow = layout.projectDirectory
+            .file('.github/workflows/cd.yaml').asFile.getText('UTF-8')
+        if (cdWorkflow =~ /app-id:\s*app-glejqzwk/) {
+            throw new GradleException('CD workflow must not publish to the upstream link-submit app.')
+        }
+        if (!cdWorkflow.contains('skip-appstore-release: true')) {
+            throw new GradleException('CD workflow must skip App Store release until this project has its own app id.')
+        }
+        def contributors = widgetPackage.contributors*.url*.toString()
+        if (!contributors.contains('https://github.com/chengzhongxue')) {
+            throw new GradleException('Widget metadata must retain the upstream author attribution.')
+        }
+        def readme = layout.projectDirectory.file('README.md').asFile.getText('UTF-8')
+        ['chengzhongxue/link-submit', 'PluginLinks'].each { marker ->
+            if (!readme.contains(marker)) {
+                throw new GradleException("README is missing required source/boundary attribution: ${marker}")
+            }
+        }
+    }
+}
+
+tasks.register('verifyEnhancementBoundary') {
+    group = 'verification'
+    description = 'Ensure the plugin remains a thin enhancement for official PluginLinks.'
+    inputs.files(
+        fileTree('src/main/java'),
+        layout.projectDirectory.file('src/main/resources/plugin.yaml'),
+        layout.projectDirectory.file('src/main/resources/extensions/settings.yaml'),
+        layout.projectDirectory.file('packages/link-submit-widget/src/index.ts'),
+        layout.projectDirectory.file('packages/link-submit-widget/src/site-info.ts')
+    )
+    doLast {
+        fileTree('src/main/java').each { source ->
+            def javaText = source.getText('UTF-8')
+            ['schemeManager.register', 'LinkSubmit.class', 'linksubmits', 'link-applications']
+                .each { forbidden ->
+                    if (javaText.contains(forbidden)) {
+                        throw new GradleException(
+                            "Enhancement plugin must not own application data or writes: ${forbidden} in ${source.name}"
+                        )
+                    }
+                }
+        }
+
+        def anonymousEndpoint = layout.projectDirectory
+            .file('src/main/java/run/halo/linksubmit/endpoint/AnonymousEndpoint.java')
+            .asFile.getText('UTF-8')
+        if (!anonymousEndpoint.contains('.GET("site-info"')) {
+            throw new GradleException('site-info is the only public API this enhancement may expose')
+        }
+        ['.POST(', '"configuration"'].each { forbidden ->
+            if (anonymousEndpoint.contains(forbidden)) {
+                throw new GradleException("Anonymous API must stay read-only and single-purpose: ${forbidden}")
+            }
+        }
+
+        def footerProcessor = layout.projectDirectory
+            .file('src/main/java/run/halo/linksubmit/LinkApplyEnhanceFooterProcessor.java')
+            .asFile.getText('UTF-8')
+        ['link-apply-enhance.iife.js', 'data-link-preview-enabled'].each { required ->
+            if (!footerProcessor.contains(required)) {
+                throw new GradleException("Footer processor must inject the enhancement script: ${required}")
+            }
+        }
+        ['var.css', 'link-submit-widget', 'displayTheSubmitButton'].each { forbidden ->
+            if (footerProcessor.contains(forbidden)) {
+                throw new GradleException("Footer processor must not revive the legacy widget shell: ${forbidden}")
+            }
+        }
+
+        def widget = layout.projectDirectory
+            .file('packages/link-submit-widget/src/index.ts').asFile.getText('UTF-8')
+        ['links/apply/submit', 'data-link-enhance'].each { required ->
+            if (!widget.contains(required)) {
+                throw new GradleException("Enhancement script must attach to the official form: ${required}")
+            }
+        }
+        ['api.link.halo.run/v1alpha1/link-applications', 'captcha', 'fetchDocument']
+            .each { forbidden ->
+                if (widget.contains(forbidden)) {
+                    throw new GradleException(
+                        "Enhancement script must not submit applications or reimplement the official form: ${forbidden}"
+                    )
+                }
+            }
+
+        def siteInfo = layout.projectDirectory
+            .file('packages/link-submit-widget/src/site-info.ts').asFile.getText('UTF-8')
+        if (!siteInfo.contains('/apis/api.link.submit.halo.run/v1alpha1/site-info')) {
+            throw new GradleException('Enhancement must call this plugin site-info endpoint only')
+        }
+
+        def settingsYaml = layout.projectDirectory
+            .file('src/main/resources/extensions/settings.yaml').asFile.getText('UTF-8')
+        ['displayTheSubmitButton', 'autoAudit', 'enableHealthCheck'].each { forbidden ->
+            if (settingsYaml.contains(forbidden)) {
+                throw new GradleException("Settings must not expose retired switches: ${forbidden}")
+            }
+        }
+
+        def pluginYaml = layout.projectDirectory.file('src/main/resources/plugin.yaml')
+            .asFile.getText('UTF-8')
+        if (!pluginYaml.contains('"PluginLinks": ">=2.3.0 & <3.0.0"')) {
+            throw new GradleException(
+                'PluginLinks dependency must use the verified 2.x application API range'
+            )
+        }
+        if (!pluginYaml.contains('requires: ">=2.27.0"')) {
+            throw new GradleException('Halo 2.27 is the verified minimum for the 2.27 build target')
+        }
+        ['notification.yaml', 'notification-templates.yaml'].each { filename ->
+            if (file("src/main/resources/extensions/${filename}").exists()) {
+                throw new GradleException("Enhancement plugin must not register legacy notification resource: ${filename}")
+            }
+        }
+        ['src/main/resources/static/link-submit-widget.iife.js',
+         'src/main/resources/static/var.css',
+         'src/main/java/run/halo/linksubmit/extension',
+         'ui/src/api'].each { legacy ->
+            if (file(legacy).exists()) {
+                throw new GradleException("Legacy self-built submission asset is still present: ${legacy}")
+            }
+        }
+    }
+}
+
+tasks.register('verifyWidgetRuntimeAsset') {
+    group = 'verification'
+    description = 'Verify the packaged enhancement runtime asset matches the source contract.'
+    dependsOn project(':packages:link-submit-widget').tasks.named('build')
+    inputs.file(layout.projectDirectory.file('src/main/resources/static/link-apply-enhance.iife.js'))
+    doLast {
+        def runtimeAsset = layout.projectDirectory
+            .file('src/main/resources/static/link-apply-enhance.iife.js').asFile.getText('UTF-8')
+        ['links/apply/submit', 'data-link-enhance'].each { required ->
+            if (!runtimeAsset.contains(required)) {
+                throw new GradleException("Generated enhancement runtime asset is stale: ${required}")
+            }
+        }
+        ['link-applications', 'captcha'].each { forbidden ->
+            if (runtimeAsset.contains(forbidden)) {
+                throw new GradleException("Enhancement asset must not own official submission: ${forbidden}")
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn('verifyVersionConsistency')
+    dependsOn('verifyPublicationMetadata')
+    dependsOn('verifyEnhancementBoundary')
+    dependsOn('verifyWidgetRuntimeAsset')
+    dependsOn project(':packages:link-submit-widget').tasks.named('testFrontend')
+    dependsOn project(':packages:link-submit-widget').tasks.named('lintFrontend')
+}

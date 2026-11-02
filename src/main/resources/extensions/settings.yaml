@@ -1,0 +1,20 @@
+apiVersion: v1alpha1
+kind: Setting
+metadata:
+  name: link-submit-next-settings
+spec:
+  forms:
+    - group: basic
+      label: 前台增强
+      formSchema:
+        - $formkit: switch
+          name: loadPlugInResources
+          id: loadPlugInResources
+          label: 加载增强脚本
+          help: 在友链页官方 PluginLinks 申请表单旁注入「获取信息」按钮；申请、审核与通知仍由官方链接插件负责
+          value: true
+        - $formkit: switch
+          name: enableLinkPreview
+          label: 自动获取网站信息
+          help: 允许访客通过服务端安全代理获取网站标题、描述和 Logo；不会代替官方申请校验
+          value: true
