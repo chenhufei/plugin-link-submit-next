@@ -1,0 +1,50 @@
+plugins {
+    id "com.github.node-gradle.node" version "7.1.0"
+}
+
+node {
+    // Reuse the Node.js installation configured by the developer or CI.
+    download = false
+    version = '24.15.0'
+    pnpmVersion = '10.22.0'
+}
+
+tasks.register('installDepsForWidget', PnpmTask) {
+    args = ['install', '--frozen-lockfile']
+    environment = ['CI': 'true']
+}
+
+tasks.register('clean', Delete) {
+    delete layout.buildDirectory
+}
+
+tasks.register('build', PnpmTask) {
+    group = 'build'
+    description = 'Build link-submit-widget package.'
+    dependsOn tasks.named('installDepsForWidget')
+    pnpmCommand = ['run', 'build']
+    inputs.dir('src')
+    inputs.files(fileTree('node_modules').exclude('.cache'))
+    inputs.files(layout.projectDirectory.asFile.listFiles({ pathname ->
+        pathname.name.endsWithAny(".json", ".yaml", ".env", ".ts", ".json")
+    } as FileFilter))
+    outputs.dir(layout.buildDirectory.dir('dist'))
+}
+
+tasks.register('testFrontend', PnpmTask) {
+    group = 'verification'
+    description = 'Run link submit widget unit tests.'
+    dependsOn tasks.named('installDepsForWidget')
+    pnpmCommand = ['run', 'test:ci']
+    inputs.dir('src')
+    inputs.files('package.json', 'vitest.config.ts', 'vite.config.lib.ts')
+}
+
+tasks.register('lintFrontend', PnpmTask) {
+    group = 'verification'
+    description = 'Run the Widget lint check without modifying source files.'
+    pnpmCommand = ['run', 'lint:check']
+    dependsOn tasks.named('installDepsForWidget')
+    inputs.dir(layout.projectDirectory.dir('src'))
+    inputs.files('package.json', '.eslintrc.json', '.prettierrc.json')
+}

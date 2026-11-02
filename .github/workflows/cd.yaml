@@ -1,0 +1,22 @@
+name: CD
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  cd:
+    uses: halo-sigs/reusable-workflows/.github/workflows/plugin-cd.yaml@v4
+    secrets:
+      halo-pat: ${{ secrets.HALO_PAT }}
+    permissions:
+      contents: write
+    with:
+      node-version: "24"
+      pnpm-version: "10"
+      skip-node-setup: false
+      ui-path: "."
+      # This project has no own Halo App Store application yet. Keep releases on GitHub
+      # until an app id owned by chenhufei is created; never reuse the upstream app id.
+      skip-appstore-release: true
