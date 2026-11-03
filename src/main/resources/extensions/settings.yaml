@@ -5,7 +5,7 @@ metadata:
 spec:
   forms:
     - group: basic
-      label: 前台增强
+      label: 友链申请增强
       formSchema:
         - $formkit: switch
           name: loadPlugInResources

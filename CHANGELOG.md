@@ -4,6 +4,26 @@
 
 ---
 
+## [0.0.4] - 2026-11-03
+
+### 新增
+
+- **增强按钮自带最小内联样式**：脚本注入 `<style data-link-enhance-style>`，给「获取信息」按钮、转圈与状态文字一套跟随 `currentColor` 的基础样式。此前完全依赖主题样式，主题没适配这些类名时按钮就是一个空白方块，访客根本看不出能点。主题要接管外观覆盖同名类即可。
+
+### 修复
+
+- **403 / 502 没设 `Content-Type`**：只有 429 返回 `application/problem+json`，另外两个错误仍是默认的 JSON 类型。统一为 problem+json，与 Halo 的错误约定一致。
+- **「增强设置」入口按 view 权限判断**：点击目标是插件设置页，而设置页要 manage，只有查看权限的账号点进去就是一堵无权限提示。改为按 manage 显示。
+- **页头结构失配时静默无提示**：注入点依赖控制台的 `.page-header .page-header__actions`，Halo 升级改类名后按钮会凭空消失且没有任何日志。找不到容器时按路径去重后 `console.warn` 一次。
+
+### 清理
+
+- 删除 `ReverseProxy` 里 `/static/**` 的映射：全仓零引用（脚本走 `/plugins/link-submit-next/assets/**` 的内置约定，实测该路径 200、`/static/` 404）。
+- 删除匿名角色里永不参与匹配的 `nonResourceURLs` 规则（`/apis` 前缀按资源解析，这条规则形同虚设）。
+- 合并重复的 `BasicConfig` 与 `BasicGroupConfig`：字段与默认值现在只有一份，`getBasicConfig()` 直接返回组配置。
+
+---
+
 ## [0.0.3] - 2026-11-03
 
 ### 修复

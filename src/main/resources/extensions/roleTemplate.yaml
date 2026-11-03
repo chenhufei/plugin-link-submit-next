@@ -13,9 +13,6 @@ rules:
   - apiGroups: [ "api.link.submit.halo.run" ]
     resources: [ "site-info" ]
     verbs: [ "get", "list" ]
-  - nonResourceURLs:
-      - "/apis/api.link.submit.halo.run/v1alpha1/site-info"
-    verbs: [ "get" ]
 
 
 ---

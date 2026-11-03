@@ -125,7 +125,12 @@ public class AnonymousEndpoint implements CustomEndpoint {
     Mono<ServerResponse> fetchSiteInfo(ServerRequest request) {
         String url = request.queryParam("url").orElse("").trim();
         if (url.isEmpty()) {
-            return ServerResponse.badRequest().bodyValue(Map.of("error", "url 参数不能为空"));
+            return ServerResponse.badRequest()
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .bodyValue(Map.of(
+                    "title", "缺少参数",
+                    "status", HttpStatus.BAD_REQUEST.value(),
+                    "detail", "url 参数不能为空"));
         }
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
             url = "https://" + url;
@@ -153,10 +158,12 @@ public class AnonymousEndpoint implements CustomEndpoint {
                         // 具体原因（内网地址被拒 / 主机无法解析 / 端口不允许）只写日志。
                         // 原样回显等于给出「这个主机是否存在、是否在内网」的探测 oracle。
                         log.warn("Rejected site-info url {}: {}", finalUrl, e.getMessage());
-                        return ServerResponse.badRequest().bodyValue(Map.of(
-                            "title", "URL 不可访问",
-                            "status", 400,
-                            "detail", "该地址不受支持或无法访问"));
+                        return ServerResponse.badRequest()
+                            .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                            .bodyValue(Map.of(
+                                "title", "URL 不可访问",
+                                "status", HttpStatus.BAD_REQUEST.value(),
+                                "detail", "该地址不受支持或无法访问"));
                     })
                     .onErrorResume(e -> {
                         log.warn("Failed to fetch site info for {}: {}", finalUrl, e.getMessage());
@@ -176,7 +183,7 @@ public class AnonymousEndpoint implements CustomEndpoint {
      */
     private Mono<Boolean> linkPreviewEnabled() {
         return settingConfigLinkSubmit.getBasicConfig()
-            .map(SettingConfigLinkSubmit.BasicConfig::isEnableLinkPreview)
+            .map(SettingConfigLinkSubmit.BasicGroupConfig::isEnableLinkPreview)
             .onErrorResume(e -> {
                 log.warn("Read link submit config failed, link preview stays disabled", e);
                 return Mono.just(Boolean.FALSE);
@@ -194,17 +201,21 @@ public class AnonymousEndpoint implements CustomEndpoint {
     }
 
     private static Mono<ServerResponse> previewDisabled() {
-        return ServerResponse.status(HttpStatus.FORBIDDEN).bodyValue(Map.of(
-            "title", "链接预览未启用",
-            "status", 403,
-            "detail", "管理员已关闭链接预览功能"));
+        return ServerResponse.status(HttpStatus.FORBIDDEN)
+            .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+            .bodyValue(Map.of(
+                "title", "链接预览未启用",
+                "status", HttpStatus.FORBIDDEN.value(),
+                "detail", "管理员已关闭链接预览功能"));
     }
 
     private static Mono<ServerResponse> siteUnavailable() {
-        return ServerResponse.status(502).bodyValue(Map.of(
-            "title", "网站信息获取失败",
-            "status", 502,
-            "detail", "目标网站暂时无法访问"));
+        return ServerResponse.status(HttpStatus.BAD_GATEWAY)
+            .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+            .bodyValue(Map.of(
+                "title", "网站信息获取失败",
+                "status", HttpStatus.BAD_GATEWAY.value(),
+                "detail", "目标网站暂时无法访问"));
     }
 
     /**

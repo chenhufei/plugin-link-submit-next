@@ -1,6 +1,6 @@
 {
     "name": "@chenhufei/link-submit-next-widget",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "description": "Halo 官方 PluginLinks 友链申请表单的服务端网站信息自动获取增强脚本",
     "license": "GPL-3.0-only",
     "homepage": "https://github.com/chenhufei/plugin-link-submit-next",

@@ -19,7 +19,7 @@ class AnonymousEndpointRateLimitTest {
     @Test
     void shouldRateLimitSiteInfoWithoutFetchingRemoteSite() {
         var settings = mock(SettingConfigLinkSubmit.class);
-        var basic = new SettingConfigLinkSubmit.BasicConfig();
+        var basic = new SettingConfigLinkSubmit.BasicGroupConfig();
         basic.setEnableLinkPreview(true);
         when(settings.getBasicConfig()).thenReturn(Mono.just(basic));
         var registry = RateLimiterRegistry.ofDefaults();

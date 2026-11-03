@@ -36,9 +36,16 @@ function createEntry() {
   return entry
 }
 
+/**
+ * 入口按钮跳的是插件设置页，而设置页要 manage 才能打开。
+ * 只按 view 判断会让「能看见菜单、点进去一堵无权限」的账号反复踩坑，
+ * 所以这里直接要求 manage；没有权限的账号不显示这个入口。
+ */
+const REQUIRED_PERMISSIONS = ['plugin:link:submit-next:manage']
+
 function defaultPermissionGuard() {
   try {
-    return utils.permission.has(['plugin:link:submit-next:view'])
+    return utils.permission.has(REQUIRED_PERMISSIONS)
   } catch {
     return false
   }
@@ -54,6 +61,10 @@ export function installLinksManagementEntry(options: EntryOptions = {}) {
   const hasPermission = options.hasPermission ?? defaultPermissionGuard
   let observer: MutationObserver | undefined
 
+  // 选择器依赖 Halo 控制台的页头结构。结构变了只会表现为「按钮不见了」，
+  // 没有任何报错，所以这里按路径去重后 warn 一次，便于下次排查。
+  let warnedPathname = ''
+
   const syncEntry = () => {
     const existing = document.querySelector<HTMLElement>(`[${ENTRY_ATTRIBUTE}]`)
     if (!isLinksConsolePage() || !hasPermission()) {
@@ -63,9 +74,16 @@ export function installLinksManagementEntry(options: EntryOptions = {}) {
 
     const actions = findLinksHeaderActions()
     if (!actions) {
+      if (warnedPathname !== window.location.pathname) {
+        warnedPathname = window.location.pathname
+        console.warn(
+          '[link-submit-next] 未找到友链控制台的页头操作区（.page-header .page-header__actions），「增强设置」入口未注入。Halo 升级若改了页头结构，需要同步更新这个选择器。'
+        )
+      }
       existing?.remove()
       return
     }
+    warnedPathname = ''
 
     if (!existing) {
       actions.prepend(createEntry())

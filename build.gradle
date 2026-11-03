@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'run.halo.linksubmit'
-version '0.0.3'
+version '0.0.4'
 
 repositories {
     mavenCentral()
@@ -38,11 +38,33 @@ tasks.withType(JavaCompile).configureEach {
     options.release = 21
 }
 
-tasks.register('processUiResources', Copy) {
+tasks.register('processUiResources', Sync) {
     from project(':ui').layout.buildDirectory.dir('dist')
     into layout.buildDirectory.dir('resources/main/ui')
     dependsOn project(':ui').tasks.named('buildFrontend')
     shouldRunAfter tasks.named('processResources')
+    doFirst {
+        // rsbuild 是增量输出：改一次代码就多留一个带哈希的 main.<hash>.js，
+        // 旧入口会被一起打进 jar —— 同一份源码打出不同的 jar，sha256 不可复现。
+        // 这里按 ui-plugin.json 指向的入口/样式做一次清理，只保留当前这一份。
+        def distDir = project(':ui').layout.buildDirectory.dir('dist').get().asFile
+        def manifestFile = new File(distDir, 'ui-plugin.json')
+        if (manifestFile.exists()) {
+            def manifest = new groovy.json.JsonSlurper().parse(manifestFile)
+            def keep = new HashSet<String>()
+            ['entry', 'style'].each { key ->
+                def value = manifest[key]
+                if (value) {
+                    keep.add(value.toString().replaceFirst(/^\.\//, ''))
+                }
+            }
+            distDir.eachFile { file ->
+                if (file.isFile() && file.name != 'ui-plugin.json' && !keep.contains(file.name)) {
+                    file.delete()
+                }
+            }
+        }
+    }
 }
 
 tasks.named('classes') {

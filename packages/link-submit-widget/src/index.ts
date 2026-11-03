@@ -31,6 +31,36 @@ const FETCH_ICON =
   '<path d="M13.82 14H9.66C9.56 13.34 9.5 12.68 9.5 12S9.56 10.65 9.66 10H14.34C14.43 10.65 14.5 11.32 14.5 12C14.5 12.5 14.46 13 14.4 13.46C15 12.96 15.72 12.57 16.5 12.32C16.5 12.21 16.5 12.11 16.5 12C16.5 11.32 16.44 10.66 16.36 10H19.74C19.9 10.64 20 11.31 20 12C20 12.06 20 12.12 20 12.18C20.7 12.35 21.35 12.63 21.95 13C22 12.68 22 12.34 22 12C22 6.5 17.5 2 12 2C6.47 2 2 6.5 2 12C2 17.5 6.5 22 12 22C12.34 22 12.68 22 13 21.95C12.59 21.29 12.29 20.55 12.13 19.75C12.09 19.82 12.05 19.89 12 19.96C11.17 18.76 10.5 17.43 10.09 16H12.5C12.81 15.25 13.26 14.58 13.82 14M18.92 8H15.97C15.65 6.75 15.19 5.55 14.59 4.44C16.43 5.07 17.96 6.34 18.92 8M12 4.03C12.83 5.23 13.5 6.57 13.91 8H10.09C10.5 6.57 11.17 5.23 12 4.03M4.26 14C4.1 13.36 4 12.69 4 12S4.1 10.64 4.26 10H7.64C7.56 10.66 7.5 11.32 7.5 12S7.56 13.34 7.64 14H4.26M5.08 16H8C8.35 17.25 8.8 18.45 9.4 19.56C7.57 18.93 6.03 17.65 5.08 16M8 8H5.08C6.03 6.34 7.57 5.06 9.4 4.44C8.8 5.55 8.35 6.75 8 8M20.83 15.67L22 14.5V18.5H18L19.77 16.73C19.32 16.28 18.69 16 18 16C16.62 16 15.5 17.12 15.5 18.5S16.62 21 18 21C18.82 21 19.54 20.61 20 20H21.71C21.12 21.47 19.68 22.5 18 22.5C15.79 22.5 14 20.71 14 18.5S15.79 14.5 18 14.5C19.11 14.5 20.11 14.95 20.83 15.67Z"/>' +
   '</svg>';
 const FETCH_SPINNER = '<span class="link-enhance-spinner" aria-hidden="true"></span>';
+/**
+ * 最小内联样式：主题没有适配这些类名时，按钮不能变成一个空白方块。
+ * 颜色一律用 currentColor 与半透明描边，深浅色主题都不用额外适配；
+ * 主题想接管外观时覆盖同名类即可。
+ */
+const ENHANCE_CSS = `
+.link-enhance-url-wrap{display:inline-flex;align-items:center;gap:.375rem;max-width:100%}
+.link-enhance-tools{display:flex;align-items:center;gap:.5rem;margin-top:.5rem;font-size:.8125rem;line-height:1.4}
+.link-enhance-fetch{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:2rem;height:2rem;padding:0;border:1px solid rgba(127,127,127,.4);border-radius:.375rem;background:transparent;color:inherit;cursor:pointer}
+.link-enhance-fetch:hover:not(:disabled){background:rgba(127,127,127,.12)}
+.link-enhance-fetch:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.link-enhance-fetch:disabled{cursor:default;opacity:.6}
+.link-enhance-icon{display:block}
+.link-enhance-spinner{display:block;width:.875rem;height:.875rem;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:link-enhance-spin .8s linear infinite}
+.link-enhance-status:empty{display:none}
+.link-enhance-status[data-status="success"]{color:#2f9e44}
+.link-enhance-status[data-status="error"]{color:#d14343}
+@keyframes link-enhance-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.link-enhance-spinner{animation-duration:2.4s}}
+`;
+
+/** 只注入一次，避免 MutationObserver 每次扫描都往 head 里塞节点 */
+function injectEnhanceStyles(): void {
+  if (!document.head) return;
+  if (document.querySelector('style[data-link-enhance-style]')) return;
+  const style = document.createElement('style');
+  style.setAttribute('data-link-enhance-style', 'true');
+  style.textContent = ENHANCE_CSS;
+  document.head.appendChild(style);
+}
 
 const FORM_FIELDS: SiteInfoField[] = ['displayName', 'logo', 'description'];
 
@@ -215,6 +245,7 @@ function matchesApplyForm(form: HTMLFormElement): boolean {
 
 export function enhanceLinkApplyForms(): void {
   if (!isLinkPreviewEnabled()) return;
+  injectEnhanceStyles();
   // 这里**不能**写成 'form[action]'：PluginLinks 2.5 起申请改走 REST，
   // 表单可以完全没有 action 属性，预筛选一旦要求 action，
   // 下面 matchesApplyForm 里「按字段特征识别」的兜底就永远走不到，

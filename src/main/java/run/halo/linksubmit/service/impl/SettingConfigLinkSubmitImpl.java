@@ -20,14 +20,8 @@ public class SettingConfigLinkSubmitImpl implements SettingConfigLinkSubmit {
      * 而站长在后台看到的开关明明是开着的。
      */
     @Override
-    public Mono<BasicConfig> getBasicConfig() {
+    public Mono<BasicGroupConfig> getBasicConfig() {
         return settingFetcher.fetch(BasicGroupConfig.GROUP, BasicGroupConfig.class)
-            .defaultIfEmpty(new BasicGroupConfig())
-            .map(basic -> {
-                var config = new BasicConfig();
-                config.setLoadPlugInResources(basic.isLoadPlugInResources());
-                config.setEnableLinkPreview(basic.isEnableLinkPreview());
-                return config;
-            });
+            .defaultIfEmpty(new BasicGroupConfig());
     }
 }

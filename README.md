@@ -58,13 +58,21 @@
 主题负责按官方接口渲染申请表单，字段名使用官方约定：`url`、`displayName`、`logo`、`description`、`email`、`backlink`、`feedUrls`、`captchaCode`，提交到 `POST /links/apply/submit`（携带 `_csrf`）。插件注入的元素如下，主题可据此定制样式：
 
 ```html
+<span class="link-enhance-url-wrap">
+  <input name="url" …>
+  <button type="button" class="link-enhance-fetch" data-link-enhance-fetch="true"
+          aria-label="获取网站信息" title="获取网站信息"><svg class="link-enhance-icon">…</svg></button>
+</span>
 <span class="link-enhance-tools">
-  <button type="button" class="link-enhance-fetch" data-link-enhance-fetch="true">获取信息</button>
   <span class="link-enhance-status" role="status" aria-live="polite"></span>
 </span>
 ```
 
-被增强的表单会带上 `data-link-enhanced="true"`；状态节点通过 `data-status="idle|pending|success|error"` 表示当前结果。NUCMA 主题已适配该结构。
+按钮是**纯图标**（地球刷新图标，与官方友链后台的字段后缀按钮一致），文字只出现在 `aria-label` 与 `title` 里，屏幕上不显示「获取信息」四个字。运行中按钮内含 `.link-enhance-spinner`。
+
+被增强的表单会带上 `data-link-enhanced="true"`；状态节点通过 `data-status="idle|pending|success|error"` 表示当前结果。
+
+脚本会往 `<head>` 注入一段最小内联样式（`<style data-link-enhance-style>`），保证主题没有适配这些类名时按钮不会变成空白方块。主题若想接管外观，覆盖同名类即可；不要删掉 `data-link-enhance-style` 这个标记，否则每次扫描都会重复注入。NUCMA 主题已按该结构定制。
 
 主题不应复制提交表单的校验逻辑，也不应另建一套友链存储或审核流程。
 
@@ -103,7 +111,7 @@ Console bundle 和增强脚本运行时资源均由 Gradle 关联任务生成和
 <https://gitee.com/xiui-cc/theme-nucma/blob/main/CONTRIBUTING.md>：
 
 - 改前先同步；协作者不推 `main`，一律开分支提 PR。
-- 只改源码，`static/**` 与 `link-submit-widget.iife.js` 由构建任务生成。
+- 只改源码，`static/**` 与 `link-apply-enhance.iife.js` 由构建任务生成。
 - 自检 `./gradlew cleanTest test`，打包 `./gradlew.bat build -x test`，出了 jar 才算完成。
 - 版本四处一致：`build.gradle` + `gradle.properties` + `plugin.yaml` + `packages/link-submit-widget/package.json`；会进包才升版本。
 - 只推 Gitee，GitHub 由镜像自动同步。

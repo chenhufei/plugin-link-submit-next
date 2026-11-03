@@ -86,3 +86,6 @@ application-local.properties
 *.lnk
 compile*.txt
 diag.txt
+
+# pnpm 安装残留（可能是空目录，也可能是 0 字节文件），别误提交
+_tmp_*
