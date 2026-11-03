@@ -23,6 +23,7 @@ const FIELD_CLASS = 'link-enhance-url-wrap';
 const BUTTON_CLASS = 'link-enhance-fetch';
 const STATUS_CLASS = 'link-enhance-status';
 const ENHANCED_ATTRIBUTE = 'data-link-enhanced';
+const SITE_INFO_TIMEOUT_MS = 15000;
 
 /** 与官方友链后台编辑弹窗一致：mdi:web-refresh 地球图标 */
 const FETCH_ICON =
@@ -47,6 +48,26 @@ const formStates = new WeakMap<HTMLFormElement, FormState>();
 function isLinkPreviewEnabled(): boolean {
   const script = document.querySelector<HTMLScriptElement>(ENHANCE_SCRIPT_SELECTOR);
   return !script || script.dataset.linkPreviewEnabled !== 'false';
+}
+
+/** AbortSignal.timeout 在旧 WebView 里不存在，退化时不传 signal，不能因此让按钮点不动 */
+function createTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
+  if (typeof AbortSignal === 'undefined' || typeof AbortSignal.timeout !== 'function') {
+    return undefined;
+  }
+  return AbortSignal.timeout(timeoutMs);
+}
+
+/**
+ * 网络层错误在浏览器里是英文的 "Failed to fetch" / "Load failed"，
+ * 原样贴在表单上只会让访客以为是网站坏了，这里统一换成能指导下一步的中文。
+ */
+function fetchErrorMessage(error: unknown): string {
+  const name = (error as { name?: string } | null)?.name;
+  if (name === 'TimeoutError' || name === 'AbortError') {
+    return '获取超时，请手动填写';
+  }
+  return '无法连接本站服务器，请稍后重试或手动填写';
 }
 
 function setStatus(state: FormState, message: string, kind: StatusKind): void {
@@ -98,6 +119,9 @@ async function fetchSiteInfo(form: HTMLFormElement, state: FormState, urlInput: 
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
       cache: 'no-store',
+      // 网络层半死不活时 fetch 可以挂几分钟，按钮一直是 loading 状态，
+      // 访客只能刷新。后端 12s 超时，前端留 15s 兜底。
+      signal: createTimeoutSignal(SITE_INFO_TIMEOUT_MS),
     });
     const info = (await response.json().catch(() => ({}))) as SiteInfo;
     if (requestId !== state.requestId) return;
@@ -121,11 +145,7 @@ async function fetchSiteInfo(form: HTMLFormElement, state: FormState, urlInput: 
     }
   } catch (error) {
     if (requestId !== state.requestId) return;
-    setStatus(
-      state,
-      error instanceof Error && error.message ? error.message : '获取网站信息失败，请手动填写',
-      'error'
-    );
+    setStatus(state, fetchErrorMessage(error), 'error');
   } finally {
     if (requestId === state.requestId && state.status.dataset.status === 'pending') {
       setStatus(state, '', 'idle');
@@ -195,7 +215,11 @@ function matchesApplyForm(form: HTMLFormElement): boolean {
 
 export function enhanceLinkApplyForms(): void {
   if (!isLinkPreviewEnabled()) return;
-  Array.from(document.querySelectorAll<HTMLFormElement>('form[action]'))
+  // 这里**不能**写成 'form[action]'：PluginLinks 2.5 起申请改走 REST，
+  // 表单可以完全没有 action 属性，预筛选一旦要求 action，
+  // 下面 matchesApplyForm 里「按字段特征识别」的兜底就永远走不到，
+  // 表现为按钮整体消失且没有任何报错。候选集合交给 matchesApplyForm 判定。
+  Array.from(document.querySelectorAll<HTMLFormElement>('form'))
     .filter(matchesApplyForm)
     .forEach((form) => enhanceForm(form));
 }

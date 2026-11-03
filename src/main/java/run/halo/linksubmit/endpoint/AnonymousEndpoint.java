@@ -166,13 +166,17 @@ public class AnonymousEndpoint implements CustomEndpoint {
     }
 
     /**
-     * 读取链接预览开关。配置缺失或读取失败时按关闭处理：
-     * 这个开关本身就是保护，"读不到就当开启"会让保护在故障时消失。
+     * 读取链接预览开关。
+     *
+     * <p>设置组缺失（刚装上插件、从没保存过设置）时，{@code getBasicConfig()} 给的是
+     * {@code extensions/settings.yaml} 里声明的默认值——也就是开启，和站长在后台看到的
+     * 开关状态一致。这里原先挂着一个 {@code defaultIfEmpty(Boolean.FALSE)}，但上游
+     * {@code map} 之后永远不会是空流，那句代码执行不到，注释却写着「缺失即关闭」，
+     * 两句话互相矛盾。真读失败（异常）才按关闭处理：这是保护开关，故障时不该消失。
      */
     private Mono<Boolean> linkPreviewEnabled() {
         return settingConfigLinkSubmit.getBasicConfig()
             .map(SettingConfigLinkSubmit.BasicConfig::isEnableLinkPreview)
-            .defaultIfEmpty(Boolean.FALSE)
             .onErrorResume(e -> {
                 log.warn("Read link submit config failed, link preview stays disabled", e);
                 return Mono.just(Boolean.FALSE);
