@@ -54,14 +54,14 @@
 ### 2.3 拉取
 
 ```bash
-git clone https://gitee.com/xiui-cc/plugin-link-submit-next.git
+git clone https://gitee.com/nucma/plugin-link-submit-next.git
 ```
 
 ### 2.4 远程约定（重要）
 
 | 平台 | 地址形态 | 用途 |
 |---|---|---|
-| **Gitee（主）** | `gitee` → `https://gitee.com/xiui-cc/plugin-link-submit-next.git` | 日常协作、分支、PR、发版，**全部在这里** |
+| **Gitee（主）** | `gitee` → `https://gitee.com/nucma/plugin-link-submit-next.git` | 日常协作、分支、PR、发版，**全部在这里** |
 | GitHub（镜像） | `origin` | 只读分发，由 Gitee 的 Push 镜像自动同步（约 5 分钟） |
 
 两条铁律：

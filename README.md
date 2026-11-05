@@ -108,7 +108,7 @@ Console bundle 和增强脚本运行时资源均由 Gradle 关联任务生成和
 ## 参与开发
 
 三仓（主题 + 成员插件 + 本插件）共用一套协同流程，**动手前先读**
-<https://gitee.com/xiui-cc/theme-nucma/blob/main/CONTRIBUTING.md>：
+<https://gitee.com/nucma/theme-nucma/blob/main/CONTRIBUTING.md>：
 
 - 改前先同步；协作者不推 `main`，一律开分支提 PR。
 - 只改源码，`static/**` 与 `link-apply-enhance.iife.js` 由构建任务生成。
@@ -125,7 +125,7 @@ Console bundle 和增强脚本运行时资源均由 Gradle 关联任务生成和
 
 ## 反馈与许可
 
-- 仓库（主）：<https://gitee.com/xiui-cc/plugin-link-submit-next>
+- 仓库（主）：<https://gitee.com/nucma/plugin-link-submit-next>
 - 镜像：<https://github.com/chenhufei/plugin-link-submit-next>
-- 问题反馈：<https://gitee.com/xiui-cc/plugin-link-submit-next/issues>
+- 问题反馈：<https://gitee.com/nucma/plugin-link-submit-next/issues>
 - 许可证：GPL-3.0
